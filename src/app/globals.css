@@ -1,92 +1,94 @@
 @import "tailwindcss";
 
 :root {
-  --paper: #fff7e8;
-  --card: #ffffff;
-  --ink: #1b1a1f;
-  --muted: #6b6676;
-  --pink: #ff4d8d;
-  --lime: #c6f432;
-  --tangerine: #ff9f1c;
-  --sky: #5ad1ff;
-  --grape: #9b5cff;
-  --shadow: #1b1a1f;
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --surface-2: #f1f1ee;
+  --line: #e4e4e0;
+  --fg: #18181b;
+  --muted: #71717a;
+  --accent: #0d8a5f;
+  --accent-hover: #0b7752;
+  --accent-soft: #e7f5ef;
+  --accent-fg: #ffffff;
+  --warn-soft: #fff6e0;
+  --warn-fg: #8a5a00;
+  --danger: #c2410c;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #16141b;
-    --card: #221f29;
-    --ink: #f6efe4;
-    --muted: #a7a0b3;
-    --shadow: #000000;
+    --bg: #0f0f11;
+    --surface: #18181b;
+    --surface-2: #222226;
+    --line: #2e2e33;
+    --fg: #f4f4f5;
+    --muted: #a1a1aa;
+    --accent: #34c48f;
+    --accent-hover: #4fd3a1;
+    --accent-soft: #0f2a20;
+    --accent-fg: #0b1a14;
+    --warn-soft: #2a2110;
+    --warn-fg: #f5c566;
+    --danger: #fb8a5b;
   }
 }
 
 @theme inline {
-  --color-paper: var(--paper);
-  --color-card: var(--card);
-  --color-ink: var(--ink);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
   --color-muted: var(--muted);
-  --color-pink: var(--pink);
-  --color-lime: var(--lime);
-  --color-tangerine: var(--tangerine);
-  --color-sky: var(--sky);
-  --color-grape: var(--grape);
-  --font-sans: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fg: var(--accent-fg);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-fg: var(--warn-fg);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 body {
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--bg);
+  color: var(--fg);
   -webkit-tap-highlight-color: transparent;
 }
 
 @layer components {
   .card {
-    @apply rounded-3xl border-[3px] border-ink bg-card p-5;
-    box-shadow: 5px 5px 0 0 var(--shadow);
+    @apply rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)];
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-2xl border-[3px] border-ink px-4 py-2.5 font-bold text-[#1b1a1f] transition-transform active:translate-x-[3px] active:translate-y-[3px] disabled:opacity-50;
-    box-shadow: 3px 3px 0 0 var(--shadow);
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
   }
-  .btn:active {
-    box-shadow: 0 0 0 0 var(--shadow);
+  .btn-primary {
+    @apply bg-accent text-accent-fg hover:bg-[var(--accent-hover)];
   }
-  .btn-pink { @apply bg-pink; }
-  .btn-lime { @apply bg-lime; }
-  .btn-tangerine { @apply bg-tangerine; }
-  .btn-sky { @apply bg-sky; }
-  .btn-ghost { @apply bg-card text-ink; }
+  .btn-secondary {
+    @apply border border-line bg-surface text-fg hover:bg-surface-2;
+  }
+  .btn-quiet {
+    @apply text-muted hover:text-fg;
+  }
   .input {
-    @apply w-full rounded-2xl border-[3px] border-ink bg-card px-4 py-2.5 text-ink outline-none placeholder:text-muted focus:ring-4 focus:ring-pink/40;
+    @apply w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-fg outline-none transition-shadow placeholder:text-muted/70 focus:border-accent focus:ring-4 focus:ring-accent/15;
   }
   .label {
-    @apply mb-1 block text-xs font-extrabold uppercase tracking-wider text-muted;
+    @apply mb-1.5 block text-sm font-medium text-muted;
   }
   .chip {
-    @apply inline-flex items-center gap-1 rounded-full border-2 border-ink px-2.5 py-0.5 text-sm font-bold;
+    @apply inline-flex items-center gap-1 rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-fg;
+  }
+  .notice {
+    @apply rounded-xl bg-warn-soft px-4 py-3 text-sm font-medium text-warn-fg;
+  }
+  .section-title {
+    @apply text-base font-semibold;
   }
   .money {
     font-variant-numeric: tabular-nums;
   }
-}
-
-@keyframes wiggle {
-  0%, 100% { transform: rotate(-3deg); }
-  50% { transform: rotate(3deg); }
-}
-.wiggle { animation: wiggle 1.2s ease-in-out infinite; }
-
-@keyframes pop {
-  0% { transform: scale(0.9); }
-  60% { transform: scale(1.06); }
-  100% { transform: scale(1); }
-}
-.pop { animation: pop 220ms ease-out; }
-
-@media (prefers-reduced-motion: reduce) {
-  .wiggle, .pop { animation: none; }
 }

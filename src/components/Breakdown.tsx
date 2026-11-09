@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import type { BillDTO } from "@/lib/bills";
 import { setPaid } from "@/app/actions";
 import { formatMoney } from "@/lib/money";
-import { badgesFor } from "@/lib/badges";
+import { Avatar } from "@/components/Avatar";
 
 type Bill = NonNullable<BillDTO>;
 
@@ -15,82 +15,73 @@ export function Breakdown({ bill, mode }: { bill: Bill; mode: "owner" | "guest" 
   const payer = bill.participants.find((p) => p.isPayer);
   const shareById = new Map(split.shares.map((s) => [s.participantId, s]));
   const itemName = new Map(bill.items.map((i) => [i.id, i.name]));
-  const badges = badgesFor(bill);
 
   return (
     <section className="space-y-3">
-      <h2 className="text-xl font-extrabold">Who owes what 💸</h2>
+      <h2 className="section-title">Breakdown</h2>
 
       {split.unclaimedItemIds.length > 0 && (
-        <div className="rounded-2xl border-[3px] border-ink bg-tangerine p-3 font-bold text-[#1b1a1f]">
-          🚨 {formatMoney(split.unclaimedCents)} in unclaimed items is being{" "}
-          {bill.unclaimedPolicy === "EVEN" ? "split evenly between everyone" : `put on ${payer?.displayName ?? "the payer"}`}.
-          Somebody ate that!
-        </div>
+        <p className="notice">
+          {formatMoney(split.unclaimedCents)} of items haven&apos;t been claimed yet. For now they&apos;re{" "}
+          {bill.unclaimedPolicy === "EVEN" ? "split evenly between everyone" : `assigned to ${payer?.displayName ?? "the payer"}`}.
+        </p>
       )}
 
-      <ul className="space-y-2.5">
+      <ul className="card divide-y divide-line !p-0 overflow-hidden">
         {bill.participants.map((p) => {
           const s = shareById.get(p.id)!;
           const isMe = p.id === bill.viewer.meId;
           const expanded = open === p.id;
           return (
-            <li key={p.id} className={`card !p-0 overflow-hidden ${isMe ? "ring-4 ring-pink/50" : ""}`}>
+            <li key={p.id}>
               <button
                 onClick={() => setOpen(expanded ? null : p.id)}
                 aria-expanded={expanded}
-                className="flex w-full items-center gap-3 p-4 text-left"
+                className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-2"
               >
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border-[3px] border-ink bg-paper text-2xl">
-                  {p.emoji}
-                </span>
+                <Avatar id={p.id} name={p.displayName} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-extrabold">
-                    {p.displayName} {isMe && <span className="text-pink">(you)</span>}
+                  <span className="block truncate font-medium">
+                    {p.displayName}
+                    {isMe && <span className="font-normal text-muted"> (you)</span>}
                   </span>
-                  <span className="flex flex-wrap gap-1 text-xs">
-                    {p.isPayer && <span className="chip !py-0 bg-sky text-[#1b1a1f]">💳 paid the bill</span>}
-                    {!p.isPayer && p.paidAt && <span className="chip !py-0 bg-lime text-[#1b1a1f]">✅ paid up</span>}
-                    {badges.get(p.id)?.map((b) => (
-                      <span key={b.label} title={b.hint} className="chip !py-0 bg-paper text-ink">
-                        {b.label}
-                      </span>
-                    ))}
+                  <span className="text-xs text-muted">
+                    {p.isPayer ? "Paid the bill" : p.paidAt ? <span className="text-accent">Paid back</span> : "Owes"}
                   </span>
                 </span>
-                <span className="money text-right">
-                  <span className="block text-xl font-extrabold">{formatMoney(s.totalCents)}</span>
-                  <span className="block text-xs text-muted">{expanded ? "hide" : "details"}</span>
+                <span className="money font-semibold">{formatMoney(s.totalCents)}</span>
+                <span aria-hidden className={`text-muted transition-transform ${expanded ? "rotate-90" : ""}`}>
+                  ›
                 </span>
               </button>
 
               {expanded && (
-                <div className="border-t-[3px] border-dashed border-ink/30 px-4 pb-4 pt-3 text-sm">
-                  <dl className="money space-y-1">
+                <div className="bg-surface-2/50 px-4 pb-4 pt-1 text-sm">
+                  <dl className="money space-y-1.5">
                     {Object.entries(s.itemBreakdown).map(([itemId, cents]) => (
-                      <Row key={itemId} label={itemName.get(itemId) ?? "Item"} value={cents} />
+                      <Row key={itemId} label={itemName.get(itemId) ?? "Item"} value={cents} muted />
                     ))}
-                    {Object.keys(s.itemBreakdown).length === 0 && <p className="text-muted">Didn&apos;t claim anything 👻</p>}
-                    <hr className="my-2 border-ink/20" />
-                    <Row label="Items" value={s.itemsCents} bold />
-                    {s.taxCents !== 0 && <Row label="Tax you 'ordered' 🙄" value={s.taxCents} />}
+                    {Object.keys(s.itemBreakdown).length === 0 && <p className="text-muted">No items claimed.</p>}
+                    <div className="my-2 h-px bg-line" />
+                    <Row label="Items" value={s.itemsCents} />
+                    {s.taxCents !== 0 && <Row label="Tax" value={s.taxCents} />}
                     {s.tipCents !== 0 && <Row label="Tip" value={s.tipCents} />}
                     {s.feesCents !== 0 && <Row label="Fees" value={s.feesCents} />}
-                    {s.discountCents !== 0 && <Row label="Discount 🎉" value={-s.discountCents} />}
+                    {s.discountCents !== 0 && <Row label="Discount" value={-s.discountCents} />}
                     <Row label="Total" value={s.totalCents} bold />
                   </dl>
                   {!p.isPayer && payer && (
-                    <p className="mt-3 font-bold">
-                      {isMe ? "You owe" : `${p.displayName} owes`} {payer.emoji} {payer.id === bill.viewer.meId ? "you" : payer.displayName}{" "}
-                      {formatMoney(s.totalCents)}
+                    <p className="mt-3 text-muted">
+                      {isMe ? "You owe" : `${p.displayName} owes`} {payer.id === bill.viewer.meId ? "you" : payer.displayName}{" "}
+                      <span className="money font-medium text-fg">{formatMoney(s.totalCents)}</span>.
                     </p>
                   )}
                   {mode === "owner" && !p.isPayer && (
                     <button
                       onClick={() => startTransition(() => setPaid(p.id, !p.paidAt))}
-                      className={`btn mt-3 w-full ${p.paidAt ? "btn-ghost" : "btn-lime"}`}
+                      className={`btn mt-3 w-full ${p.paidAt ? "btn-secondary" : "btn-primary"}`}
                     >
-                      {p.paidAt ? "Undo paid" : "Mark as paid ✅"}
+                      {p.paidAt ? "Mark as unpaid" : "Mark as paid"}
                     </button>
                   )}
                 </div>
@@ -100,24 +91,27 @@ export function Breakdown({ bill, mode }: { bill: Bill; mode: "owner" | "guest" 
         })}
       </ul>
 
-      <div className="card money space-y-1 text-sm">
+      <dl className="card money space-y-1.5 text-sm">
         <Row label="Subtotal" value={split.subtotalCents} />
         {bill.taxCents !== 0 && <Row label="Tax" value={bill.taxCents} />}
         {split.tipCents !== 0 && (
-          <Row label={bill.tipMode === "AMOUNT" ? "Tip" : `Tip (${bill.tipPercent}%${bill.tipMode === "PERCENT_POST_TAX" ? " after tax" : ""})`} value={split.tipCents} />
+          <Row
+            label={bill.tipMode === "AMOUNT" ? "Tip" : `Tip (${bill.tipPercent}%${bill.tipMode === "PERCENT_POST_TAX" ? " of total with tax" : ""})`}
+            value={split.tipCents}
+          />
         )}
         {bill.feesCents !== 0 && <Row label="Fees" value={bill.feesCents} />}
         {bill.discountCents !== 0 && <Row label="Discount" value={-bill.discountCents} />}
-        <hr className="my-2 border-ink/20" />
-        <Row label="Bill total" value={split.totalCents} bold />
-      </div>
+        <div className="my-2 h-px bg-line" />
+        <Row label="Total" value={split.totalCents} bold />
+      </dl>
     </section>
   );
 }
 
-function Row({ label, value, bold }: { label: string; value: number; bold?: boolean }) {
+function Row({ label, value, bold, muted }: { label: string; value: number; bold?: boolean; muted?: boolean }) {
   return (
-    <div className={`flex justify-between gap-3 ${bold ? "font-extrabold" : ""}`}>
+    <div className={`flex justify-between gap-3 ${bold ? "font-semibold" : ""} ${muted ? "text-muted" : ""}`}>
       <dt className="truncate">{label}</dt>
       <dd>{formatMoney(value)}</dd>
     </div>

@@ -11,6 +11,7 @@ import {
   updateCharges,
 } from "@/app/actions";
 import { formatMoney } from "@/lib/money";
+import { Avatar } from "@/components/Avatar";
 
 type Bill = NonNullable<BillDTO>;
 
@@ -33,41 +34,54 @@ function useAction() {
 
 function ErrorNote({ error }: { error: string | null }) {
   if (!error) return null;
-  return <p className="mt-2 text-sm font-bold text-pink">{error}</p>;
+  return <p className="text-sm text-danger">{error}</p>;
 }
 
 export function ShareCard({ bill }: { bill: Bill }) {
   const [copied, setCopied] = useState(false);
   const [origin, setOrigin] = useState("");
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- origin is only known in the browser
-  useEffect(() => setOrigin(window.location.origin), []);
+  const [canShare, setCanShare] = useState(false);
+  useEffect(() => {
+    // Both are only known in the browser.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setOrigin(window.location.origin);
+    setCanShare(typeof navigator.share === "function");
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
   const url = `${origin}/b/${bill.shareToken}`;
 
-  async function share() {
-    const shareUrl = `${window.location.origin}/b/${bill.shareToken}`;
-    const text = `Tap what you had from ${bill.title} 🧾`;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: bill.title, text, url: shareUrl });
-        return;
-      } catch {
-        /* user cancelled; fall through to copy */
-      }
-    }
-    await navigator.clipboard.writeText(shareUrl);
+  async function copy() {
+    await navigator.clipboard.writeText(`${window.location.origin}/b/${bill.shareToken}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
 
+  async function share() {
+    const shareUrl = `${window.location.origin}/b/${bill.shareToken}`;
+    try {
+      await navigator.share({ title: bill.title, text: `Select what you had from ${bill.title}`, url: shareUrl });
+    } catch {
+      /* cancelled */
+    }
+  }
+
   return (
-    <div className="card !bg-sky space-y-2 text-[#1b1a1f]">
-      <div className="font-extrabold">Send this to the group chat 📲</div>
-      <div className="truncate rounded-xl border-2 border-[#1b1a1f] bg-white px-3 py-2 font-mono text-sm">
-        {url}
+    <div className="card space-y-3">
+      <div>
+        <h2 className="section-title">Share with the group</h2>
+        <p className="text-sm text-muted">Anyone with this link can join and select their items.</p>
       </div>
-      <button onClick={share} className="btn btn-pink w-full">
-        {copied ? "Copied! 🎉" : "Share link"}
-      </button>
+      <div className="flex gap-2">
+        <input readOnly value={url} aria-label="Share link" className="input money min-w-0 flex-1 bg-surface-2 text-sm" onFocus={(e) => e.target.select()} />
+        <button onClick={copy} className="btn btn-secondary shrink-0">
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      {canShare && (
+        <button onClick={share} className="btn btn-primary w-full">
+          Share…
+        </button>
+      )}
     </div>
   );
 }
@@ -93,21 +107,24 @@ export function AddItemForm({ billId }: { billId: string }) {
       }}
       className="card space-y-3"
     >
-      <h2 className="text-xl font-extrabold">Add items</h2>
-      <div className="flex gap-2">
-        <input ref={nameRef} name="name" required maxLength={60} placeholder="Spicy marg" className="input flex-[3]" aria-label="Item name" />
-        <input name="price" required inputMode="decimal" placeholder="$12.00" className="input money flex-[2]" aria-label="Price" />
-      </div>
-      <div className="flex items-center gap-2">
-        <label className="flex items-center gap-2 text-sm font-bold">
-          Qty
-          <input name="qty" type="number" min={1} max={50} defaultValue={1} className="input !w-20 !py-1.5" />
+      <h2 className="section-title">Add an item</h2>
+      <div className="grid grid-cols-[1fr_7rem_4.5rem] gap-2">
+        <label>
+          <span className="label">Item</span>
+          <input ref={nameRef} name="name" required maxLength={60} placeholder="Margarita" className="input" />
         </label>
-        <span className="text-xs text-muted">price is each</span>
-        <button disabled={pending} className="btn btn-lime ml-auto shrink-0 whitespace-nowrap">
-          + Add
-        </button>
+        <label>
+          <span className="label">Price each</span>
+          <input name="price" required inputMode="decimal" placeholder="0.00" className="input money" />
+        </label>
+        <label>
+          <span className="label">Qty</span>
+          <input name="qty" type="number" min={1} max={50} defaultValue={1} className="input money" />
+        </label>
       </div>
+      <button disabled={pending} className="btn btn-secondary w-full">
+        Add item
+      </button>
       <ErrorNote error={error} />
     </form>
   );
@@ -134,20 +151,20 @@ export function ChargesForm({ bill }: { bill: Bill }) {
       }}
       className="card space-y-4"
     >
-      <h2 className="text-xl font-extrabold">Tax, tip &amp; the rest</h2>
+      <h2 className="section-title">Tax, tip and fees</h2>
 
       <label className="block">
         <span className="label">Tax (from receipt)</span>
-        <input name="tax" inputMode="decimal" defaultValue={cents(bill.taxCents)} placeholder="$0.00" className="input money" />
+        <input name="tax" inputMode="decimal" defaultValue={cents(bill.taxCents)} placeholder="0.00" className="input money" />
       </label>
 
       <div>
         <span className="label">Tip</span>
         <input type="hidden" name="tipMode" value={tipMode} />
-        <div className="mb-2 grid grid-cols-3 gap-1 rounded-2xl border-[3px] border-ink p-1 text-sm font-bold">
+        <div className="mb-2 grid grid-cols-3 gap-1 rounded-xl bg-surface-2 p-1 text-sm font-medium">
           {(
             [
-              ["AMOUNT", "$ amount"],
+              ["AMOUNT", "Amount"],
               ["PERCENT_PRE_TAX", "% pre-tax"],
               ["PERCENT_POST_TAX", "% post-tax"],
             ] as const
@@ -160,23 +177,24 @@ export function ChargesForm({ bill }: { bill: Bill }) {
                 setTip("");
                 setDirty(true);
               }}
-              className={`rounded-xl px-2 py-1.5 ${tipMode === m ? "bg-pink text-[#1b1a1f]" : ""}`}
+              className={`whitespace-nowrap rounded-lg px-2 py-1.5 transition-colors ${tipMode === m ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg"}`}
             >
               {label}
             </button>
           ))}
         </div>
-        <input
-          name="tip"
-          inputMode="decimal"
-          value={tip}
-          onChange={(e) => setTip(e.target.value)}
-          placeholder={tipMode === "AMOUNT" ? "$0.00" : "20"}
-          className="input money"
-        />
-        {tipMode !== "AMOUNT" && (
-          <div className="mt-2 flex gap-2">
-            {tipPresets.map((p) => (
+        <div className="flex gap-2">
+          <input
+            name="tip"
+            inputMode="decimal"
+            value={tip}
+            onChange={(e) => setTip(e.target.value)}
+            placeholder={tipMode === "AMOUNT" ? "0.00" : "20"}
+            aria-label={tipMode === "AMOUNT" ? "Tip amount" : "Tip percent"}
+            className="input money"
+          />
+          {tipMode !== "AMOUNT" &&
+            tipPresets.map((p) => (
               <button
                 key={p}
                 type="button"
@@ -184,48 +202,49 @@ export function ChargesForm({ bill }: { bill: Bill }) {
                   setTip(String(p));
                   setDirty(true);
                 }}
-                className={`chip ${tip === String(p) ? "bg-lime text-[#1b1a1f]" : "bg-card"}`}
+                className={`shrink-0 rounded-xl border px-2.5 text-sm font-medium transition-colors ${
+                  tip === String(p) ? "border-accent bg-accent-soft text-accent" : "border-line hover:bg-surface-2"
+                }`}
               >
                 {p}%
               </button>
             ))}
-          </div>
-        )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
           <span className="label">Fees</span>
-          <input name="fees" inputMode="decimal" defaultValue={cents(bill.feesCents)} placeholder="$0.00" className="input money" />
+          <input name="fees" inputMode="decimal" defaultValue={cents(bill.feesCents)} placeholder="0.00" className="input money" />
         </label>
         <label className="block">
           <span className="label">Split fees</span>
           <select name="feeMode" defaultValue={bill.feeMode} className="input">
-            <option value="PROPORTIONAL">By what you ordered</option>
+            <option value="PROPORTIONAL">Proportionally</option>
             <option value="EVEN">Evenly</option>
           </select>
         </label>
       </div>
 
       <label className="block">
-        <span className="label">Discount / promo</span>
-        <input name="discount" inputMode="decimal" defaultValue={cents(bill.discountCents)} placeholder="$0.00" className="input money" />
+        <span className="label">Discount</span>
+        <input name="discount" inputMode="decimal" defaultValue={cents(bill.discountCents)} placeholder="0.00" className="input money" />
       </label>
 
       <label className="block">
         <span className="label">Unclaimed items</span>
         <select name="unclaimedPolicy" defaultValue={bill.unclaimedPolicy} className="input">
           <option value="EVEN">Split evenly between everyone</option>
-          <option value="PAYER">I&apos;ll eat the cost (put it on me)</option>
+          <option value="PAYER">Assign to me</option>
         </select>
       </label>
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
         <span className="money text-sm text-muted">
-          Tip right now: <b className="text-ink">{formatMoney(bill.split.tipCents)}</b>
+          Tip: <span className="font-medium text-fg">{formatMoney(bill.split.tipCents)}</span>
         </span>
-        <button disabled={pending || !dirty} className="btn btn-pink">
-          {pending ? "Saving…" : dirty ? "Save" : "Saved ✓"}
+        <button disabled={pending || !dirty} className="btn btn-primary">
+          {pending ? "Saving…" : dirty ? "Save" : "Saved"}
         </button>
       </div>
       <ErrorNote error={error} />
@@ -238,25 +257,22 @@ export function PeoplePanel({ bill }: { bill: Bill }) {
   const { pending, error, run } = useAction();
 
   return (
-    <div className="card space-y-3">
+    <div className="card space-y-4">
       <div>
-        <h2 className="text-xl font-extrabold">The crew</h2>
-        <p className="text-sm text-muted">
-          Friends can join from the link themselves. You can also add them here and tap items on their behalf.
-        </p>
+        <h2 className="section-title">People</h2>
+        <p className="text-sm text-muted">People can join from the link, or you can add them here and select items for them.</p>
       </div>
-      <ul className="flex flex-wrap gap-2">
+      <ul className="divide-y divide-line">
         {bill.participants.map((p) => (
-          <li key={p.id} className="chip bg-paper">
-            {p.emoji} {p.displayName}
-            {p.isPlaceholder && <span className="text-xs text-muted">(not joined)</span>}
+          <li key={p.id} className="flex items-center gap-3 py-2.5">
+            <Avatar id={p.id} name={p.displayName} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">{p.displayName}</span>
+              <span className="text-xs text-muted">{p.isPayer ? "Payer" : p.isPlaceholder ? "Hasn't opened the link" : "Joined"}</span>
+            </span>
             {!p.isPayer && (
-              <button
-                onClick={() => run(() => removeParticipant(p.id))}
-                aria-label={`Remove ${p.displayName}`}
-                className="ml-1 text-muted hover:text-pink"
-              >
-                ✕
+              <button onClick={() => run(() => removeParticipant(p.id))} className="btn-quiet text-sm">
+                Remove
               </button>
             )}
           </li>
@@ -271,9 +287,9 @@ export function PeoplePanel({ bill }: { bill: Bill }) {
         }}
         className="flex gap-2"
       >
-        <input name="name" required maxLength={60} placeholder="Add a friend's name" className="input" />
-        <button disabled={pending} className="btn btn-tangerine shrink-0">
-          + Add
+        <input name="name" required maxLength={60} placeholder="Name" aria-label="Person's name" className="input" />
+        <button disabled={pending} className="btn btn-secondary shrink-0">
+          Add person
         </button>
       </form>
       <ErrorNote error={error} />
@@ -286,27 +302,34 @@ export function BillActions({ bill }: { bill: Bill }) {
   const [confirming, setConfirming] = useState(false);
   return (
     <div className="card space-y-3">
-      <h2 className="text-xl font-extrabold">Bill controls</h2>
+      <h2 className="section-title">Settings</h2>
       {bill.status === "OPEN" ? (
-        <button disabled={pending} onClick={() => run(() => setStatus(bill.id, "LOCKED"))} className="btn btn-tangerine w-full">
-          🔒 Lock claims (everyone&apos;s done)
-        </button>
+        <div className="space-y-1">
+          <button disabled={pending} onClick={() => run(() => setStatus(bill.id, "LOCKED"))} className="btn btn-secondary w-full">
+            Lock bill
+          </button>
+          <p className="text-xs text-muted">Stops guests from changing their selections.</p>
+        </div>
       ) : (
-        <button disabled={pending} onClick={() => run(() => setStatus(bill.id, "OPEN"))} className="btn btn-ghost w-full">
-          🔓 Reopen for claims
+        <button disabled={pending} onClick={() => run(() => setStatus(bill.id, "OPEN"))} className="btn btn-secondary w-full">
+          Reopen bill
         </button>
       )}
       {confirming ? (
         <div className="flex gap-2">
-          <button disabled={pending} onClick={() => run(() => deleteBill(bill.id))} className="btn btn-pink flex-1">
-            Yes, delete it
+          <button
+            disabled={pending}
+            onClick={() => run(() => deleteBill(bill.id))}
+            className="btn flex-1 bg-danger text-white hover:opacity-90"
+          >
+            Delete permanently
           </button>
-          <button onClick={() => setConfirming(false)} className="btn btn-ghost flex-1">
-            Nevermind
+          <button onClick={() => setConfirming(false)} className="btn btn-secondary flex-1">
+            Cancel
           </button>
         </div>
       ) : (
-        <button onClick={() => setConfirming(true)} className="w-full text-sm font-bold text-muted underline underline-offset-4">
+        <button onClick={() => setConfirming(true)} className="w-full text-sm font-medium text-danger">
           Delete bill
         </button>
       )}

@@ -8,9 +8,9 @@ See [`docs/PRODUCT.md`](docs/PRODUCT.md) for the product spec and roadmap.
 
 - Magic-link email sign-in (plus Google, if configured). Only the payer needs an account.
 - Create a bill, add items (with quantity), and set tax, tip ($ / % pre-tax / % post-tax), fees (proportional or even), discount, and an unclaimed-items policy.
-- Share link `/b/<token>`: guests join with a name and emoji, no account, or tap "that's me" on a placeholder the payer added.
+- Share link `/b/<token>`: guests join with just a name, no account, or pick a placeholder the payer added ("I'm Sam").
 - Tap to claim items. Shared items split by weight (− / + stepper). Live updates via polling.
-- Per-person breakdown with badges (🍖 biggest appetite, 🧀 nacho diplomat, 👻 ghost). The payer marks people paid, and the bill auto-settles when everyone has paid.
+- Per-person breakdown. The payer marks people paid, and the bill auto-settles when everyone has paid.
 - Installable PWA (manifest, icons, service worker with offline page).
 
 ## Stack

@@ -1,10 +1,10 @@
 const styles = {
-  OPEN: { cls: "bg-lime", label: "🟢 open" },
-  LOCKED: { cls: "bg-tangerine", label: "🔒 locked" },
-  SETTLED: { cls: "bg-sky", label: "✅ settled" },
+  OPEN: { cls: "bg-accent-soft text-accent", label: "Open" },
+  LOCKED: { cls: "bg-warn-soft text-warn-fg", label: "Locked" },
+  SETTLED: { cls: "bg-surface-2 text-muted", label: "Settled" },
 } as const;
 
 export function StatusChip({ status }: { status: keyof typeof styles }) {
   const s = styles[status];
-  return <span className={`chip !py-0 text-xs text-[#1b1a1f] ${s.cls}`}>{s.label}</span>;
+  return <span className={`chip ${s.cls}`}>{s.label}</span>;
 }

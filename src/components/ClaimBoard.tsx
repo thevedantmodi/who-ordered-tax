@@ -4,9 +4,9 @@ import { useOptimistic, useState, useTransition } from "react";
 import type { BillDTO } from "@/lib/bills";
 import { deleteItem, setClaim } from "@/app/actions";
 import { formatMoney } from "@/lib/money";
+import { Avatar } from "@/components/Avatar";
 
 type Bill = NonNullable<BillDTO>;
-type Claim = { participantId: string; weight: number };
 type OptimisticClaim = { itemId: string; participantId: string; weight: number };
 
 export function ClaimBoard({ bill, mode }: { bill: Bill; mode: "owner" | "guest" }) {
@@ -26,7 +26,6 @@ export function ClaimBoard({ bill, mode }: { bill: Bill; mode: "owner" | "guest"
 
   const canEdit = mode === "owner" || (meId !== null && bill.status === "OPEN");
   const people = new Map(bill.participants.map((p) => [p.id, p]));
-  const acting = actingId ? people.get(actingId) : undefined;
 
   function change(itemId: string, weight: number) {
     if (!actingId || !canEdit) return;
@@ -54,82 +53,106 @@ export function ClaimBoard({ bill, mode }: { bill: Bill; mode: "owner" | "guest"
   if (items.length === 0) {
     return (
       <div className="card text-center">
-        <div className="mb-2 text-4xl">🫙</div>
-        <p className="font-bold">No items yet.</p>
-        {mode === "guest" && <p className="text-muted">Waiting on the payer to type in the receipt…</p>}
+        <p className="font-medium">No items yet</p>
+        {mode === "guest" && <p className="text-sm text-muted">The payer hasn&apos;t entered the receipt yet.</p>}
       </div>
     );
   }
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-extrabold">
-          {canEdit ? "Tap what you had 👆" : "Items"}
-        </h2>
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h2 className="section-title">Items</h2>
+          {canEdit && <p className="text-sm text-muted">Select everything {mode === "owner" && actingId !== meId ? "they" : "you"} had.</p>}
+        </div>
         {mode === "owner" && (
-          <button onClick={() => setEditing((e) => !e)} className="text-sm font-bold text-muted underline underline-offset-4">
-            {editing ? "Done" : "Edit items"}
+          <button onClick={() => setEditing((e) => !e)} className="btn-quiet text-sm font-medium">
+            {editing ? "Done" : "Edit"}
           </button>
         )}
       </div>
 
       {mode === "owner" && bill.participants.length > 1 && (
-        <div className="card !p-3">
-          <span className="label">Tapping for</span>
-          <div className="flex flex-wrap gap-2">
-            {bill.participants.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setActingId(p.id)}
-                className={`chip ${actingId === p.id ? "bg-pink text-[#1b1a1f]" : "bg-card"}`}
-              >
-                {p.emoji} {p.id === meId ? "me" : p.displayName}
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted">Selecting for</span>
+          {bill.participants.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setActingId(p.id)}
+              className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
+                actingId === p.id ? "border-accent bg-accent-soft text-accent" : "border-line bg-surface text-fg hover:bg-surface-2"
+              }`}
+            >
+              {p.id === meId ? "Me" : p.displayName}
+            </button>
+          ))}
         </div>
       )}
 
-      {error && <p className="rounded-2xl border-[3px] border-ink bg-tangerine p-3 font-bold text-[#1b1a1f]">{error}</p>}
+      {error && <p className="notice">{error}</p>}
 
-      <ul className="space-y-2.5">
+      <ul className="card divide-y divide-line !p-0 overflow-hidden">
         {items.map((item) => {
           const mine = item.claims.find((c) => c.participantId === actingId);
           const totalWeight = item.claims.reduce((a, c) => a + c.weight, 0);
           const myShare = mine && totalWeight ? Math.round((item.priceCents * mine.weight) / totalWeight) : 0;
           const unclaimed = item.claims.length === 0;
+          const interactive = canEdit && !editing;
           return (
             <li key={item.id}>
               <div
-                role={canEdit ? "button" : undefined}
-                tabIndex={canEdit ? 0 : undefined}
-                aria-pressed={canEdit ? Boolean(mine) : undefined}
-                onClick={() => !editing && change(item.id, mine ? 0 : 1)}
+                role={interactive ? "checkbox" : undefined}
+                tabIndex={interactive ? 0 : undefined}
+                aria-checked={interactive ? Boolean(mine) : undefined}
+                aria-label={interactive ? item.name : undefined}
+                onClick={() => interactive && change(item.id, mine ? 0 : 1)}
                 onKeyDown={(e) => {
-                  if (!editing && (e.key === "Enter" || e.key === " ")) {
+                  if (interactive && (e.key === "Enter" || e.key === " ")) {
                     e.preventDefault();
                     change(item.id, mine ? 0 : 1);
                   }
                 }}
-                className={`flex items-center gap-3 rounded-2xl border-[3px] border-ink p-3 transition-colors ${
-                  mine ? "pop bg-lime text-[#1b1a1f]" : "bg-card"
-                } ${canEdit && !editing ? "cursor-pointer select-none" : ""}`}
-                style={{ boxShadow: "3px 3px 0 0 var(--shadow)" }}
+                className={`flex items-center gap-3 px-4 py-3.5 transition-colors ${
+                  mine ? "bg-accent-soft" : ""
+                } ${interactive ? "cursor-pointer select-none hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none" : ""} ${
+                  mine && interactive ? "hover:!bg-accent-soft" : ""
+                }`}
               >
+                {canEdit && !editing && (
+                  <span
+                    aria-hidden
+                    className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border text-[11px] font-bold ${
+                      mine ? "border-accent bg-accent text-accent-fg" : "border-line bg-surface"
+                    }`}
+                  >
+                    {mine ? "✓" : ""}
+                  </span>
+                )}
+
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="truncate font-extrabold">{item.name}</span>
-                    <span className="money shrink-0 font-bold">{formatMoney(item.priceCents)}</span>
+                    <span className="truncate font-medium">{item.name}</span>
+                    <span className="money shrink-0 text-sm">{formatMoney(item.priceCents)}</span>
                   </div>
-                  <div className="mt-1 flex min-h-6 flex-wrap items-center gap-1">
+                  <div className="mt-1 flex min-h-5 flex-wrap items-center gap-1.5">
                     {unclaimed ? (
-                      <span className="text-xs font-bold uppercase tracking-wide text-pink">🚨 unclaimed</span>
+                      <span className="text-xs font-medium text-warn-fg">Unclaimed</span>
                     ) : (
-                      item.claims.map((c) => <ClaimChip key={c.participantId} claim={c} person={people.get(c.participantId)} />)
+                      item.claims.map((c) => {
+                        const p = people.get(c.participantId);
+                        if (!p) return null;
+                        return (
+                          <span key={c.participantId} title={p.displayName} className="inline-flex items-center gap-1 text-xs text-muted">
+                            <Avatar id={p.id} name={p.displayName} size="sm" />
+                            <span className="max-w-24 truncate">{p.displayName}</span>
+                            {c.weight > 1 && <span>×{c.weight}</span>}
+                          </span>
+                        );
+                      })
                     )}
                     {mine && item.claims.length > 1 && (
-                      <span className="ml-auto text-xs font-bold">your cut ≈ {formatMoney(myShare)}</span>
+                      <span className="money ml-auto text-xs text-muted">share {formatMoney(myShare)}</span>
                     )}
                   </div>
                 </div>
@@ -140,20 +163,19 @@ export function ClaimBoard({ bill, mode }: { bill: Bill; mode: "owner" | "guest"
                       e.stopPropagation();
                       remove(item.id);
                     }}
-                    aria-label={`Delete ${item.name}`}
-                    className="grid h-9 w-9 place-items-center rounded-xl border-[3px] border-ink bg-pink font-extrabold text-[#1b1a1f]"
+                    className="text-sm font-medium text-danger"
                   >
-                    ✕
+                    Remove
                   </button>
                 ) : (
                   mine &&
                   canEdit && (
-                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      <Stepper label="fewer shares" onClick={() => change(item.id, mine.weight - 1)}>
+                    <div className="flex items-center rounded-lg border border-line bg-surface" onClick={(e) => e.stopPropagation()}>
+                      <Stepper label="Fewer shares" onClick={() => change(item.id, mine.weight - 1)}>
                         −
                       </Stepper>
-                      <span className="money w-5 text-center font-extrabold">{mine.weight}</span>
-                      <Stepper label="more shares" onClick={() => change(item.id, mine.weight + 1)}>
+                      <span className="money w-6 text-center text-sm font-medium">{mine.weight}</span>
+                      <Stepper label="More shares" onClick={() => change(item.id, mine.weight + 1)}>
                         +
                       </Stepper>
                     </div>
@@ -164,33 +186,14 @@ export function ClaimBoard({ bill, mode }: { bill: Bill; mode: "owner" | "guest"
           );
         })}
       </ul>
-      {acting && canEdit && mode === "owner" && actingId !== meId && (
-        <p className="text-center text-sm text-muted">
-          Assigning items to {acting.emoji} {acting.displayName}
-        </p>
-      )}
+      {canEdit && <p className="text-xs text-muted">Use − / + if you had more than an even share of something you split.</p>}
     </section>
-  );
-}
-
-function ClaimChip({ claim, person }: { claim: Claim; person?: { emoji: string; displayName: string } }) {
-  if (!person) return null;
-  return (
-    <span title={person.displayName} className="chip !border-[1.5px] !px-1.5 bg-paper text-xs text-ink">
-      {person.emoji}
-      <span className="max-w-20 truncate">{person.displayName}</span>
-      {claim.weight > 1 && <span>×{claim.weight}</span>}
-    </span>
   );
 }
 
 function Stepper({ children, onClick, label }: { children: React.ReactNode; onClick: () => void; label: string }) {
   return (
-    <button
-      onClick={onClick}
-      aria-label={label}
-      className="grid h-8 w-8 place-items-center rounded-lg border-2 border-[#1b1a1f] bg-white text-lg font-extrabold text-[#1b1a1f]"
-    >
+    <button onClick={onClick} aria-label={label} className="grid h-8 w-8 place-items-center text-muted hover:text-fg">
       {children}
     </button>
   );

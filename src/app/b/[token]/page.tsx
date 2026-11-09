@@ -22,8 +22,8 @@ export default async function GuestBillPage({ params }: PageProps<"/b/[token]">)
     <div className="space-y-6">
       <AutoRefresh />
       {bill.viewer.isOwner && (
-        <Link href={`/bills/${bill.id}`} className="btn btn-tangerine w-full">
-          ✏️ You&apos;re the payer, open the editor
+        <Link href={`/bills/${bill.id}`} className="btn btn-secondary w-full">
+          You paid for this bill. Open the editor
         </Link>
       )}
       {!joined && bill.status === "OPEN" ? (
@@ -32,18 +32,15 @@ export default async function GuestBillPage({ params }: PageProps<"/b/[token]">)
         <>
           <BillHeader bill={bill} />
           {!joined && (
-            <p className="rounded-2xl border-[3px] border-ink bg-tangerine p-3 font-bold text-[#1b1a1f]">
-              🔒 Claims are locked. Here&apos;s how it shook out.
-            </p>
+            <p className="notice">This bill is locked. Selections can no longer be changed.</p>
           )}
           <ClaimBoard bill={bill} mode="guest" />
           <Breakdown bill={bill} mode="guest" />
           {joined && !session && (
-            <div className="card text-center text-sm">
-              <p className="font-bold">Pay for the next one? 😏</p>
-              <p className="text-muted">Grab an account to start your own bills.</p>
-              <Link href="/login" className="btn btn-lime mt-3">
-                Make an account
+            <div className="card flex items-center justify-between gap-3 text-sm">
+              <p className="text-muted">Paying next time? Create an account to start your own bills.</p>
+              <Link href="/login" className="btn btn-secondary shrink-0">
+                Sign up
               </Link>
             </div>
           )}

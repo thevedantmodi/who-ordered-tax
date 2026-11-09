@@ -12,16 +12,13 @@ export default async function Login({ searchParams }: PageProps<"/login">) {
 
   return (
     <div className="card mt-8 space-y-5">
-      <div>
-        <div className="mb-2 text-5xl">👋</div>
-        <h1 className="text-3xl font-extrabold">Sign in</h1>
-        <p className="text-muted">Only whoever paid needs an account. Everyone else just needs the link.</p>
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold">Sign in</h1>
+        <p className="text-sm text-muted">Only the person who paid needs an account. Everyone else just uses the link.</p>
       </div>
 
       {error && (
-        <p className="rounded-2xl border-[3px] border-ink bg-tangerine p-3 font-bold text-[#1b1a1f]">
-          {error === "email" ? "That email looks off. Try again?" : "Sign-in hiccup. Try again?"}
-        </p>
+        <p className="notice">{error === "email" ? "That email address doesn't look right." : "Something went wrong. Please try again."}</p>
       )}
 
       <form action={signInWithEmail} className="space-y-3">
@@ -30,17 +27,17 @@ export default async function Login({ searchParams }: PageProps<"/login">) {
           <span className="label">Email</span>
           <input name="email" type="email" required autoComplete="email" placeholder="you@example.com" className="input" />
         </label>
-        <button className="btn btn-pink w-full">Email me a magic link ✨</button>
+        <button className="btn btn-primary w-full">Email me a sign-in link</button>
       </form>
 
       {googleEnabled && (
         <>
-          <div className="flex items-center gap-3 text-xs font-bold uppercase text-muted">
-            <div className="h-[3px] flex-1 rounded bg-ink/20" /> or <div className="h-[3px] flex-1 rounded bg-ink/20" />
+          <div className="flex items-center gap-3 text-xs text-muted">
+            <div className="h-px flex-1 bg-line" /> or <div className="h-px flex-1 bg-line" />
           </div>
           <form action={signInWithGoogle}>
             <input type="hidden" name="callbackUrl" value={cb} />
-            <button className="btn btn-ghost w-full">Continue with Google</button>
+            <button className="btn btn-secondary w-full">Continue with Google</button>
           </form>
         </>
       )}

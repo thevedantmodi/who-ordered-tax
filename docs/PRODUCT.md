@@ -1,8 +1,8 @@
 # Who Ordered Tax? — Product Spec
 
-> Splitwise, but the bill splits itself. Nobody ordered tax, so everybody pays their fair share of it.
+> Splitwise, but the bill splits itself. Everyone pays for what they ordered, plus their fair share of tax and tip.
 
-**Platform:** PWA (mobile-first web, installable) · **Market:** US · **Vibe:** playful, loud, a little cheeky
+**Platform:** PWA (mobile-first web, installable) · **Market:** US · **Vibe:** calm, clean, trustworthy (it handles money): neutral surfaces, one green accent, plain language
 
 ## The problem we're attacking
 
@@ -12,14 +12,14 @@
 | Everyone needs an account to participate | Guests join a bill from a link with just a name — only the payer signs in |
 | One person ends up as the group accountant | Everyone claims their own items from their own phone |
 | Paywalls on daily expenses, receipt scanning, charts | Core flow is free, forever |
-| Nagging friends is awkward | The app does the nagging (v2) |
+| Nagging friends is awkward | The app sends reminders (v2) |
 
 ## Core loop (MVP — this milestone)
 
 1. **Payer signs in** (magic link or Google) and creates a bill.
 2. **Itemize**: add line items with prices, then tax, tip (amount, % pre-tax or % post-tax), fees and discounts.
-3. **Share link**: `/b/<token>` — anyone with it can join with a name and an emoji, no account.
-4. **Tap your items**: tap to claim; shared items (the nachos) split evenly between everyone who tapped. Claims support weights (I had 2 of the 3 beers).
+3. **Share link**: `/b/<token>` — anyone with it can join with just a name, no account.
+4. **Select your items**: tap to claim; shared items (the nachos) split evenly between everyone who tapped. Claims support weights (I had 2 of the 3 beers).
 5. **Live breakdown**: each person sees items + their share of tax, tip, fees, discount = total owed, live.
 6. **Settle**: payer marks people paid; bill auto-flips to settled when everyone is square.
 
@@ -30,7 +30,7 @@
 - Tax, tip, discount: proportional to each person's item subtotal.
 - Fees: proportional (default) or split evenly (e.g. a flat delivery fee).
 - Tip modes: fixed amount, % of pre-tax subtotal, % of post-tax total.
-- Unclaimed items: split evenly among everyone (default) or left on the payer — the bill shows a loud "🚨 unclaimed" banner either way.
+- Unclaimed items: split evenly among everyone (default) or left on the payer — the bill shows an "unclaimed" notice either way.
 
 ## v2 — Groups & balances
 
@@ -45,14 +45,15 @@
 - **Receipt scanning**: photo → LLM extracts items, tax, tip, fees → review & fix → share
 - Forward a receipt email to create a bill
 - Payment deep links (Venmo / Cash App / PayPal / Zelle) with amount + memo prefilled — deferred for now
-- Auto-reminders sent *by the app*, with an opt-in escalating sass level
+- Auto-reminders sent *by the app*, so nobody has to be the one asking
 - Push notifications (PWA, iOS 16.4+ when installed)
 
-## Playful layer (sprinkled throughout)
+## Delight, in moderation
 
-- Emoji avatars, bold colors, chunky cards, cheeky copy
-- Badges: "Ordered Zero Tax" (paid exactly their share), "Biggest Appetite", "Nacho Diplomat" (most shared items), "Ghost" (never claimed anything)
-- Trip/year wrap-up à la Spotify Wrapped
+Kept subtle so the product reads as trustworthy:
+
+- Optional per-bill fun stats (biggest spender, most shared plates), off by default
+- Year-in-review summary
 - Non-money IOUs ("you owe me a coffee")
 
 ## Explicit non-goals (for now)
