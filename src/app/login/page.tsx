@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { googleEnabled } from "@/auth";
 import { getSession } from "@/lib/session";
 import { signInWithEmail, signInWithGoogle } from "@/app/actions";
+import { DemoButton } from "@/components/DemoButton";
+import { demoEnabled } from "@/lib/demo";
 
 export const metadata = { title: "Sign in" };
 
@@ -30,17 +32,18 @@ export default async function Login({ searchParams }: PageProps<"/login">) {
         <button className="btn btn-primary w-full">Email me a sign-in link</button>
       </form>
 
-      {googleEnabled && (
-        <>
-          <div className="flex items-center gap-3 text-xs text-muted">
-            <div className="h-px flex-1 bg-line" /> or <div className="h-px flex-1 bg-line" />
-          </div>
-          <form action={signInWithGoogle}>
-            <input type="hidden" name="callbackUrl" value={cb} />
-            <button className="btn btn-secondary w-full">Continue with Google</button>
-          </form>
-        </>
+      {(googleEnabled || demoEnabled()) && (
+        <div className="flex items-center gap-3 text-xs text-muted">
+          <div className="h-px flex-1 bg-line" /> or <div className="h-px flex-1 bg-line" />
+        </div>
       )}
+      {googleEnabled && (
+        <form action={signInWithGoogle}>
+          <input type="hidden" name="callbackUrl" value={cb} />
+          <button className="btn btn-secondary w-full">Continue with Google</button>
+        </form>
+      )}
+      <DemoButton />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { customAlphabet } from "nanoid";
@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
 import { guestCookieName, loadBillForAction } from "@/lib/bills";
 import { parseMoney } from "@/lib/money";
 import { isEmoji, randomEmoji } from "@/lib/emoji";
+import { cleanupDemoAccounts, createDemoAccount, demoEnabled } from "@/lib/demo";
 
 const shareId = customAlphabet("23456789abcdefghjkmnpqrstuvwxyz", 10);
 
@@ -48,6 +49,26 @@ export async function signInWithEmail(formData: FormData) {
 export async function signInWithGoogle(formData: FormData) {
   const callbackUrl = z.string().startsWith("/").catch("/bills").parse(formData.get("callbackUrl") ?? "/bills");
   await signIn("google", { redirectTo: callbackUrl });
+}
+
+/** One-click demo: fresh private account with sample bills, signed in without email. */
+export async function startDemo() {
+  if (!demoEnabled()) redirect("/login");
+  await cleanupDemoAccounts();
+  const { sessionToken, expires, billId } = await createDemoAccount();
+
+  // Match Auth.js's cookie naming: "__Secure-" prefix whenever the request is HTTPS.
+  const h = await headers();
+  const secure = (h.get("x-forwarded-proto") ?? "").split(",")[0].trim() === "https";
+  const jar = await cookies();
+  jar.set(`${secure ? "__Secure-" : ""}authjs.session-token`, sessionToken, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    secure,
+    expires,
+  });
+  redirect(`/bills/${billId}`);
 }
 
 export async function signOutAction() {
