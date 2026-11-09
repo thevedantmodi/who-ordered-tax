@@ -93,7 +93,9 @@ export function Breakdown({ bill, mode }: { bill: Bill; mode: "owner" | "guest" 
 
       <dl className="card money space-y-1.5 text-sm">
         <Row label="Subtotal" value={split.subtotalCents} />
-        {bill.taxCents !== 0 && <Row label="Tax" value={bill.taxCents} />}
+        {split.taxCents !== 0 && (
+          <Row label={bill.taxMode === "PERCENT" ? `Tax (${bill.taxPercent}%)` : "Tax"} value={split.taxCents} />
+        )}
         {split.tipCents !== 0 && (
           <Row
             label={bill.tipMode === "AMOUNT" ? "Tip" : `Tip (${bill.tipPercent}%${bill.tipMode === "PERCENT_POST_TAX" ? " of total with tax" : ""})`}

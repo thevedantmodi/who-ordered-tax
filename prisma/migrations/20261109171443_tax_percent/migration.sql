@@ -1,0 +1,6 @@
+-- CreateEnum
+CREATE TYPE "TaxMode" AS ENUM ('AMOUNT', 'PERCENT');
+
+-- AlterTable
+ALTER TABLE "Bill" ADD COLUMN     "taxMode" "TaxMode" NOT NULL DEFAULT 'AMOUNT',
+ADD COLUMN     "taxPercent" DOUBLE PRECISION NOT NULL DEFAULT 0;

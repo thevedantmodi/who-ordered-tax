@@ -84,9 +84,16 @@ export async function createBill(formData: FormData) {
   const merchant = z.string().trim().max(80).optional().parse(formData.get("merchant") || undefined);
 
   const me = await db.user.findUniqueOrThrow({ where: { id: user.id } });
+  // Most people pay the same local sales tax every time, so start from their last rate.
+  const lastRate = await db.bill.findFirst({
+    where: { ownerId: user.id, taxMode: "PERCENT", taxPercent: { gt: 0 } },
+    orderBy: { createdAt: "desc" },
+    select: { taxPercent: true },
+  });
   const bill = await db.bill.create({
     data: {
       ownerId: user.id,
+      ...(lastRate ? { taxMode: "PERCENT" as const, taxPercent: lastRate.taxPercent } : {}),
       title: title.data,
       merchant,
       shareToken: shareId(),
@@ -153,6 +160,7 @@ export async function deleteItem(itemId: string) {
 }
 
 const chargesSchema = z.object({
+  taxMode: z.enum(["AMOUNT", "PERCENT"]),
   tax: z.string(),
   tipMode: z.enum(["AMOUNT", "PERCENT_PRE_TAX", "PERCENT_POST_TAX"]),
   tip: z.string(),
@@ -170,14 +178,21 @@ export async function updateCharges(billId: string, formData: FormData) {
     if (v == null || v < 0) throw new Error("Invalid amount");
     return v;
   };
+  const percent = (s: string, what: string) => {
+    const v = Number(s.replace(/[%\s]/g, "") || 0);
+    if (!Number.isFinite(v) || v < 0 || v > 100) throw new Error(`Invalid ${what} %`);
+    return v;
+  };
   const isPercent = c.tipMode !== "AMOUNT";
-  const pct = Number(c.tip.replace(/[%\s]/g, "") || 0);
-  if (isPercent && (!Number.isFinite(pct) || pct < 0 || pct > 100)) throw new Error("Invalid tip %");
+  const pct = isPercent ? percent(c.tip, "tip") : 0;
+  const taxIsPercent = c.taxMode === "PERCENT";
 
   await db.bill.update({
     where: { id: billId },
     data: {
-      taxCents: money(c.tax),
+      taxMode: c.taxMode,
+      taxCents: taxIsPercent ? 0 : money(c.tax),
+      taxPercent: taxIsPercent ? percent(c.tax, "tax") : 0,
       tipMode: c.tipMode,
       tipCents: isPercent ? 0 : money(c.tip),
       tipPercent: isPercent ? pct : 0,

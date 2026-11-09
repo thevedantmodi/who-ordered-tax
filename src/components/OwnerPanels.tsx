@@ -141,6 +141,35 @@ export function ChargesForm({ bill }: { bill: Bill }) {
   const [dirty, setDirty] = useState(false);
   const cents = (c: number) => (c ? (c / 100).toFixed(2) : "");
 
+  // Tax: entered either as the receipt amount or as a rate. Switching converts the value.
+  const taxBase = Math.max(0, bill.split.subtotalCents - bill.discountCents);
+  const [taxMode, setTaxMode] = useState(bill.taxMode);
+  const [tax, setTax] = useState(
+    bill.taxMode === "PERCENT" ? (bill.taxPercent ? String(bill.taxPercent) : "") : cents(bill.taxCents),
+  );
+  const taxNumber = Number(tax.replace(/[$%,\s]/g, "")) || 0;
+  const taxPreviewCents = taxMode === "PERCENT" ? Math.round((taxBase * taxNumber) / 100) : Math.round(taxNumber * 100);
+  const impliedRate = taxBase > 0 ? (taxPreviewCents / taxBase) * 100 : 0;
+  const trim = (n: number, digits: number) => String(Number(n.toFixed(digits)));
+
+  // Remember what was typed before converting, so toggling back without edits restores it exactly
+  // (8.875% → $9.10 → 8.878% would otherwise lose precision).
+  const [taxMemo, setTaxMemo] = useState<{ mode: typeof taxMode; value: string; converted: string } | null>(null);
+
+  function switchTaxMode(next: typeof taxMode) {
+    if (next === taxMode) return;
+    let value = tax;
+    if (taxMemo && taxMemo.mode === next && taxMemo.converted === tax) {
+      value = taxMemo.value;
+    } else if (taxNumber > 0 && taxBase > 0) {
+      value = next === "PERCENT" ? trim(impliedRate, 3) : (taxPreviewCents / 100).toFixed(2);
+    }
+    setTaxMemo({ mode: taxMode, value: tax, converted: value });
+    setTax(value);
+    setTaxMode(next);
+    setDirty(true);
+  }
+
   return (
     <form
       onChange={() => setDirty(true)}
@@ -153,10 +182,54 @@ export function ChargesForm({ bill }: { bill: Bill }) {
     >
       <h2 className="section-title">Tax, tip and fees</h2>
 
-      <label className="block">
-        <span className="label">Tax (from receipt)</span>
-        <input name="tax" inputMode="decimal" defaultValue={cents(bill.taxCents)} placeholder="0.00" className="input money" />
-      </label>
+      <div>
+        <span className="label">Tax</span>
+        <input type="hidden" name="taxMode" value={taxMode} />
+        <div className="flex gap-2">
+          <div className="grid shrink-0 grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1 text-sm font-medium">
+            {(
+              [
+                ["AMOUNT", "Amount"],
+                ["PERCENT", "% Rate"],
+              ] as const
+            ).map(([m, label]) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={taxMode === m}
+                onClick={() => switchTaxMode(m)}
+                className={`whitespace-nowrap rounded-lg px-3 py-1.5 transition-colors ${taxMode === m ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="relative flex-1">
+            {taxMode === "AMOUNT" && (
+              <span className="pointer-events-none absolute inset-y-0 left-3.5 grid place-items-center text-muted">$</span>
+            )}
+            <input
+              name="tax"
+              inputMode="decimal"
+              value={tax}
+              onChange={(e) => setTax(e.target.value)}
+              placeholder={taxMode === "PERCENT" ? "8.875" : "0.00"}
+              aria-label={taxMode === "PERCENT" ? "Tax rate percent" : "Tax amount"}
+              className={`input money ${taxMode === "AMOUNT" ? "pl-7" : "pr-8"}`}
+            />
+            {taxMode === "PERCENT" && (
+              <span className="pointer-events-none absolute inset-y-0 right-3.5 grid place-items-center text-muted">%</span>
+            )}
+          </div>
+        </div>
+        {taxNumber > 0 && taxBase > 0 && (
+          <p className="money mt-1.5 text-xs text-muted">
+            {taxMode === "PERCENT"
+              ? `= ${formatMoney(taxPreviewCents)} on ${formatMoney(taxBase)}`
+              : `≈ ${trim(impliedRate, 2)}% of ${formatMoney(taxBase)}`}
+          </p>
+        )}
+      </div>
 
       <div>
         <span className="label">Tip</span>

@@ -96,6 +96,39 @@ describe("splitBill", () => {
     expect(r.tipCents).toBe(2200);
   });
 
+  it("computes tax from a percent rate on the post-discount subtotal", () => {
+    const r = splitBill({
+      ...base,
+      participants: people,
+      items: [
+        { id: "a", priceCents: 6000, claims: [{ participantId: "ana", weight: 1 }] },
+        { id: "b", priceCents: 4000, claims: [{ participantId: "ben", weight: 1 }] },
+      ],
+      discountCents: 1000,
+      taxMode: "PERCENT",
+      taxPercent: 8.875,
+    });
+    // (10000 - 1000) * 8.875% = 798.75 -> 799
+    expect(r.taxCents).toBe(799);
+    expect(r.shares.map((s) => s.taxCents)).toEqual([479, 320, 0]);
+    expect(sum(r.shares.map((s) => s.totalCents))).toBe(r.totalCents);
+  });
+
+  it("uses computed percent tax as the base for post-tax tip", () => {
+    const r = splitBill({
+      ...base,
+      participants: people,
+      items: [{ id: "x", priceCents: 10000, claims: [{ participantId: "ana", weight: 1 }] }],
+      taxMode: "PERCENT",
+      taxPercent: 10,
+      taxCents: 99999, // ignored in PERCENT mode
+      tipMode: "PERCENT_POST_TAX",
+      tipPercent: 20,
+    });
+    expect(r.taxCents).toBe(1000);
+    expect(r.tipCents).toBe(2200);
+  });
+
   it("splits shared items by weight", () => {
     const r = splitBill({
       ...base,
@@ -190,7 +223,9 @@ describe("splitBill", () => {
       const r = splitBill({
         participants: ps,
         items,
+        taxMode: rand(2) ? "PERCENT" : "AMOUNT",
         taxCents: rand(1000),
+        taxPercent: rand(1200) / 100,
         tipMode: (["AMOUNT", "PERCENT_PRE_TAX", "PERCENT_POST_TAX"] as const)[rand(3)],
         tipCents: rand(2000),
         tipPercent: rand(30),

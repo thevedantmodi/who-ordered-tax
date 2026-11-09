@@ -36,7 +36,8 @@ async function seedBill(
     title: string;
     merchant: string;
     daysAgo: number;
-    taxCents: number;
+    taxCents?: number;
+    taxPercent?: number;
     tip: { mode: "AMOUNT" | "PERCENT_PRE_TAX" | "PERCENT_POST_TAX"; cents?: number; percent?: number };
     feesCents?: number;
     friends: string[];
@@ -53,7 +54,9 @@ async function seedBill(
       date: new Date(Date.now() - data.daysAgo * 86_400_000),
       shareToken: shareId(),
       status: data.status ?? "OPEN",
-      taxCents: data.taxCents,
+      taxMode: data.taxPercent ? "PERCENT" : "AMOUNT",
+      taxCents: data.taxCents ?? 0,
+      taxPercent: data.taxPercent ?? 0,
       tipMode: data.tip.mode,
       tipCents: data.tip.cents ?? 0,
       tipPercent: data.tip.percent ?? 0,
@@ -98,7 +101,7 @@ export async function createDemoAccount() {
     title: "Taco Tuesday",
     merchant: "Los Hermanos",
     daysAgo: 0,
-    taxCents: 775,
+    taxPercent: 8.875,
     tip: { mode: "PERCENT_PRE_TAX", percent: 20 },
     friends: ["Sam", "Priya", "Jordan"],
     items: [

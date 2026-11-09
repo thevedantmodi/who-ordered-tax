@@ -70,6 +70,11 @@ enum BillStatus {
   SETTLED
 }
 
+enum TaxMode {
+  AMOUNT
+  PERCENT
+}
+
 enum TipMode {
   AMOUNT
   PERCENT_PRE_TAX
@@ -95,7 +100,9 @@ model Bill {
   date            DateTime        @default(now())
   shareToken      String          @unique
   status          BillStatus      @default(OPEN)
+  taxMode         TaxMode         @default(AMOUNT)
   taxCents        Int             @default(0)
+  taxPercent      Float           @default(0)
   tipMode         TipMode         @default(AMOUNT)
   tipCents        Int             @default(0)
   tipPercent      Float           @default(0)

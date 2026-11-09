@@ -5,6 +5,7 @@
  * rounding so per-person totals always sum exactly to the bill total.
  */
 
+export type TaxMode = "AMOUNT" | "PERCENT";
 export type TipMode = "AMOUNT" | "PERCENT_PRE_TAX" | "PERCENT_POST_TAX";
 export type FeeMode = "PROPORTIONAL" | "EVEN";
 export type UnclaimedPolicy = "EVEN" | "PAYER";
@@ -18,7 +19,10 @@ export interface SplitItem {
 export interface SplitInput {
   participants: { id: string; isPayer?: boolean }[];
   items: SplitItem[];
+  /** AMOUNT uses taxCents; PERCENT applies taxPercent to (subtotal − discount). Defaults to AMOUNT. */
+  taxMode?: TaxMode;
   taxCents: number;
+  taxPercent?: number;
   tipMode: TipMode;
   tipCents: number;
   tipPercent: number;
@@ -45,6 +49,8 @@ export interface PersonShare {
 
 export interface SplitResult {
   subtotalCents: number;
+  /** Bill-level tax actually used (computed from the rate in PERCENT mode). */
+  taxCents: number;
   tipCents: number;
   totalCents: number;
   unclaimedItemIds: string[];
@@ -84,6 +90,17 @@ export function allocate(total: number, weights: number[]): number[] {
     remaining -= 1;
   }
   return out;
+}
+
+export function computeTax(
+  mode: TaxMode,
+  taxCents: number,
+  taxPercent: number,
+  subtotalCents: number,
+  discountCents: number,
+): number {
+  if (mode === "AMOUNT") return taxCents;
+  return Math.round((Math.max(0, subtotalCents - discountCents) * taxPercent) / 100);
 }
 
 export function computeTip(
@@ -151,15 +168,16 @@ export function splitBill(input: SplitInput): SplitResult {
   }
 
   const subtotalCents = input.items.reduce((a, it) => a + it.priceCents, 0);
-  const tipCents = computeTip(
-    input.tipMode,
-    input.tipCents,
-    input.tipPercent,
-    subtotalCents,
+  const taxCents = computeTax(
+    input.taxMode ?? "AMOUNT",
     input.taxCents,
+    input.taxPercent ?? 0,
+    subtotalCents,
+    input.discountCents,
   );
+  const tipCents = computeTip(input.tipMode, input.tipCents, input.tipPercent, subtotalCents, taxCents);
 
-  const tax = allocate(input.taxCents, items);
+  const tax = allocate(taxCents, items);
   const tip = allocate(tipCents, items);
   const fees =
     input.feeMode === "EVEN"
@@ -181,9 +199,9 @@ export function splitBill(input: SplitInput): SplitResult {
 
   return {
     subtotalCents,
+    taxCents,
     tipCents,
-    totalCents:
-      subtotalCents + input.taxCents + tipCents + input.feesCents - input.discountCents,
+    totalCents: subtotalCents + taxCents + tipCents + input.feesCents - input.discountCents,
     unclaimedItemIds,
     unclaimedCents,
     shares,
