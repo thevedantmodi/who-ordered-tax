@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Auth.js tables ----------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  emoji         String    @default("🦝")
+  accounts      Account[]
+  sessions      Session[]
+  billsOwned    Bill[]        @relation("BillOwner")
+  participants  Participant[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+// ---------- Bills ----------
+
+enum BillStatus {
+  OPEN
+  LOCKED
+  SETTLED
+}
+
+enum TipMode {
+  AMOUNT
+  PERCENT_PRE_TAX
+  PERCENT_POST_TAX
+}
+
+enum FeeMode {
+  PROPORTIONAL
+  EVEN
+}
+
+enum UnclaimedPolicy {
+  EVEN
+  PAYER
+}
+
+model Bill {
+  id              String          @id @default(cuid())
+  ownerId         String
+  owner           User            @relation("BillOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  title           String
+  merchant        String?
+  date            DateTime        @default(now())
+  shareToken      String          @unique
+  status          BillStatus      @default(OPEN)
+  taxCents        Int             @default(0)
+  tipMode         TipMode         @default(AMOUNT)
+  tipCents        Int             @default(0)
+  tipPercent      Float           @default(0)
+  feesCents       Int             @default(0)
+  feeMode         FeeMode         @default(PROPORTIONAL)
+  discountCents   Int             @default(0)
+  unclaimedPolicy UnclaimedPolicy @default(EVEN)
+  items           Item[]
+  participants    Participant[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([ownerId])
+}
+
+model Item {
+  id         String   @id @default(cuid())
+  billId     String
+  bill       Bill     @relation(fields: [billId], references: [id], onDelete: Cascade)
+  name       String
+  priceCents Int
+  position   Int      @default(0)
+  claims     Claim[]
+  createdAt  DateTime @default(now())
+
+  @@index([billId])
+}
+
+model Participant {
+  id          String    @id @default(cuid())
+  billId      String
+  bill        Bill      @relation(fields: [billId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  displayName String
+  emoji       String    @default("🦝")
+  isPayer     Boolean   @default(false)
+  /// Random secret stored in an httpOnly cookie to identify guests.
+  guestSecret String?   @unique
+  paidAt      DateTime?
+  claims      Claim[]
+  createdAt   DateTime  @default(now())
+
+  @@unique([billId, userId])
+  @@index([billId])
+}
+
+model Claim {
+  itemId        String
+  item          Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  weight        Int         @default(1)
+
+  @@id([itemId, participantId])
+}

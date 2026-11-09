@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #fff7e8;
+  --card: #ffffff;
+  --ink: #1b1a1f;
+  --muted: #6b6676;
+  --pink: #ff4d8d;
+  --lime: #c6f432;
+  --tangerine: #ff9f1c;
+  --sky: #5ad1ff;
+  --grape: #9b5cff;
+  --shadow: #1b1a1f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #16141b;
+    --card: #221f29;
+    --ink: #f6efe4;
+    --muted: #a7a0b3;
+    --shadow: #000000;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-pink: var(--pink);
+  --color-lime: var(--lime);
+  --color-tangerine: var(--tangerine);
+  --color-sky: var(--sky);
+  --color-grape: var(--grape);
+  --font-sans: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer components {
+  .card {
+    @apply rounded-3xl border-[3px] border-ink bg-card p-5;
+    box-shadow: 5px 5px 0 0 var(--shadow);
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl border-[3px] border-ink px-4 py-2.5 font-bold text-[#1b1a1f] transition-transform active:translate-x-[3px] active:translate-y-[3px] disabled:opacity-50;
+    box-shadow: 3px 3px 0 0 var(--shadow);
+  }
+  .btn:active {
+    box-shadow: 0 0 0 0 var(--shadow);
+  }
+  .btn-pink { @apply bg-pink; }
+  .btn-lime { @apply bg-lime; }
+  .btn-tangerine { @apply bg-tangerine; }
+  .btn-sky { @apply bg-sky; }
+  .btn-ghost { @apply bg-card text-ink; }
+  .input {
+    @apply w-full rounded-2xl border-[3px] border-ink bg-card px-4 py-2.5 text-ink outline-none placeholder:text-muted focus:ring-4 focus:ring-pink/40;
+  }
+  .label {
+    @apply mb-1 block text-xs font-extrabold uppercase tracking-wider text-muted;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border-2 border-ink px-2.5 py-0.5 text-sm font-bold;
+  }
+  .money {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+.wiggle { animation: wiggle 1.2s ease-in-out infinite; }
+
+@keyframes pop {
+  0% { transform: scale(0.9); }
+  60% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+.pop { animation: pop 220ms ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wiggle, .pop { animation: none; }
+}
