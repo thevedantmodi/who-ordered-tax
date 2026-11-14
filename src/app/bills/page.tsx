@@ -41,7 +41,7 @@ export default async function Bills() {
         <ul className="card divide-y divide-line !p-0">
           {bills.map((b) => {
             const subtotal = b.items.reduce((a, i) => a + i.priceCents, 0);
-            const href = b.ownerId === userId ? `/bills/${b.id}` : `/b/${b.shareToken}`;
+            const href = `/b/${b.shareToken}`;
             return (
               <li key={b.id}>
                 <Link href={href} className="flex items-center justify-between gap-3 p-4 transition-colors hover:bg-surface-2">

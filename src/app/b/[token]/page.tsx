@@ -7,13 +7,34 @@ import { ClaimBoard } from "@/components/ClaimBoard";
 import { Breakdown } from "@/components/Breakdown";
 import { JoinGate } from "@/components/JoinGate";
 import { AutoRefresh } from "@/components/AutoRefresh";
+import { AddItemForm, BillActions, ChargesForm, PeoplePanel, ShareCard } from "@/components/OwnerPanels";
 
-export const metadata = { title: "Split the bill", robots: { index: false } };
+export const metadata = { title: "Bill", robots: { index: false } };
 
-export default async function GuestBillPage({ params }: PageProps<"/b/[token]">) {
+/**
+ * The one link for a bill. The payer sees the editing tools here; everyone else sees the guest view.
+ * (Old /bills/<id> editor links forward here.)
+ */
+export default async function BillPage({ params }: PageProps<"/b/[token]">) {
   const { token } = await params;
   const bill = await loadBill({ shareToken: token });
   if (!bill) notFound();
+
+  if (bill.viewer.isOwner) {
+    return (
+      <div className="space-y-6">
+        <AutoRefresh />
+        <BillHeader bill={bill} />
+        <ShareCard bill={bill} />
+        <AddItemForm billId={bill.id} />
+        <ClaimBoard bill={bill} mode="owner" />
+        <ChargesForm bill={bill} />
+        <PeoplePanel bill={bill} />
+        <Breakdown bill={bill} mode="owner" />
+        <BillActions bill={bill} />
+      </div>
+    );
+  }
 
   const session = await getSession();
   const joined = bill.viewer.meId !== null;
@@ -21,19 +42,12 @@ export default async function GuestBillPage({ params }: PageProps<"/b/[token]">)
   return (
     <div className="space-y-6">
       <AutoRefresh />
-      {bill.viewer.isOwner && (
-        <Link href={`/bills/${bill.id}`} className="btn btn-secondary w-full">
-          You paid for this bill. Open the editor
-        </Link>
-      )}
       {!joined && bill.status === "OPEN" ? (
         <JoinGate bill={bill} defaultName={session?.user?.name ?? undefined} />
       ) : (
         <>
           <BillHeader bill={bill} />
-          {!joined && (
-            <p className="notice">This bill is locked. Selections can no longer be changed.</p>
-          )}
+          {!joined && <p className="notice">This bill is locked. Selections can no longer be changed.</p>}
           <ClaimBoard bill={bill} mode="guest" />
           <Breakdown bill={bill} mode="guest" />
           {joined && !session && (

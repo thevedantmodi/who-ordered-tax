@@ -91,7 +91,7 @@ async function seedBill(
   return bill;
 }
 
-/** Create a demo user with sample data and a database session. Returns the session token and the bill to open. */
+/** Create a demo user with sample data and a database session. Returns the session token and the bill link to open. */
 export async function createDemoAccount() {
   const user = await db.user.create({
     data: { name: "Alex", email: `demo-${randomUUID()}@${DEMO_DOMAIN}` },
@@ -140,5 +140,5 @@ export async function createDemoAccount() {
   const expires = new Date(Date.now() + DEMO_TTL_MS);
   await db.session.create({ data: { sessionToken, userId: user.id, expires } });
 
-  return { sessionToken, expires, billId: dinner.id };
+  return { sessionToken, expires, shareToken: dinner.shareToken };
 }

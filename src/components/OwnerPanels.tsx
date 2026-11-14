@@ -69,7 +69,7 @@ export function ShareCard({ bill }: { bill: Bill }) {
     <div className="card space-y-3">
       <div>
         <h2 className="section-title">Share with the group</h2>
-        <p className="text-sm text-muted">Anyone with this link can join and select their items.</p>
+        <p className="text-sm text-muted">This page&apos;s link works for everyone: friends can join and pick their items, and only you see the editing tools.</p>
       </div>
       <div className="flex gap-2">
         <input readOnly value={url} aria-label="Share link" className="input money min-w-0 flex-1 bg-surface-2 text-sm" onFocus={(e) => e.target.select()} />

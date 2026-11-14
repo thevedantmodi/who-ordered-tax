@@ -17,7 +17,6 @@ import { cleanupDemoAccounts, createDemoAccount, demoEnabled } from "@/lib/demo"
 const shareId = customAlphabet("23456789abcdefghjkmnpqrstuvwxyz", 10);
 
 function touch(bill: { id: string; shareToken: string }) {
-  revalidatePath(`/bills/${bill.id}`);
   revalidatePath(`/b/${bill.shareToken}`);
   revalidatePath("/bills");
 }
@@ -56,7 +55,7 @@ export async function signInWithGoogle(formData: FormData) {
 export async function startDemo() {
   if (!demoEnabled()) redirect("/login");
   await cleanupDemoAccounts();
-  const { sessionToken, expires, billId } = await createDemoAccount();
+  const { sessionToken, expires, shareToken } = await createDemoAccount();
 
   // Match Auth.js's cookie naming: "__Secure-" prefix whenever the request is HTTPS.
   const h = await headers();
@@ -69,7 +68,7 @@ export async function startDemo() {
     secure,
     expires,
   });
-  redirect(`/bills/${billId}`);
+  redirect(`/b/${shareToken}`);
 }
 
 export async function signOutAction() {
@@ -108,7 +107,7 @@ export async function createBill(formData: FormData) {
       },
     },
   });
-  redirect(`/bills/${bill.id}`);
+  redirect(`/b/${bill.shareToken}`);
 }
 
 export async function deleteBill(billId: string) {

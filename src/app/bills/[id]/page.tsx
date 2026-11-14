@@ -1,34 +1,16 @@
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
-import { loadBill } from "@/lib/bills";
-import { BillHeader } from "@/components/BillHeader";
-import { ClaimBoard } from "@/components/ClaimBoard";
-import { Breakdown } from "@/components/Breakdown";
-import { AddItemForm, BillActions, ChargesForm, PeoplePanel, ShareCard } from "@/components/OwnerPanels";
-import { AutoRefresh } from "@/components/AutoRefresh";
+import { db } from "@/lib/db";
 
-export const metadata = { title: "Bill" };
-
-export default async function OwnerBillPage({ params }: PageProps<"/bills/[id]">) {
+/**
+ * Legacy editor links. Every bill now has one link (/b/<shareToken>) that shows the payer the
+ * editing tools, so forward there. Logged-out visitors sign in first, so an old internal link
+ * never hands the share code to a stranger.
+ */
+export default async function LegacyBillRedirect({ params }: PageProps<"/bills/[id]">) {
   const { id } = await params;
-  const session = await getSession();
-  if (!session) redirect(`/login?callbackUrl=/bills/${id}`);
-
-  const bill = await loadBill({ id });
+  if (!(await getSession())) redirect(`/login?callbackUrl=/bills/${id}`);
+  const bill = await db.bill.findUnique({ where: { id }, select: { shareToken: true } });
   if (!bill) notFound();
-  if (!bill.viewer.isOwner) redirect(`/b/${bill.shareToken}`);
-
-  return (
-    <div className="space-y-6">
-      <AutoRefresh />
-      <BillHeader bill={bill} />
-      <ShareCard bill={bill} />
-      <AddItemForm billId={bill.id} />
-      <ClaimBoard bill={bill} mode="owner" />
-      <ChargesForm bill={bill} />
-      <PeoplePanel bill={bill} />
-      <Breakdown bill={bill} mode="owner" />
-      <BillActions bill={bill} />
-    </div>
-  );
+  redirect(`/b/${bill.shareToken}`);
 }
