@@ -79,19 +79,23 @@ export function ClaimBoard({ bill, mode }: { bill: Bill; mode: "owner" | "guest"
       </div>
 
       {mode === "owner" && bill.participants.length > 1 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted">Selecting for</span>
-          {bill.participants.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setActingId(p.id)}
-              className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
-                actingId === p.id ? "border-accent bg-accent-soft text-accent" : "border-line bg-surface text-fg hover:bg-surface-2"
-              }`}
-            >
-              {p.id === meId ? "Me" : p.displayName}
-            </button>
-          ))}
+        <div className="space-y-1.5">
+          <span className="block text-sm text-muted">Selecting for</span>
+          <div className="flex flex-wrap gap-2 p-1">
+            {bill.participants.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setActingId(p.id)}
+                aria-pressed={actingId === p.id}
+                className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium transition ${personColor(p.color)} ${
+                  actingId === p.id ? "ring-2 ring-current ring-offset-2 ring-offset-bg" : "opacity-60 hover:opacity-100"
+                }`}
+              >
+                {actingId === p.id && <span aria-hidden>✓</span>}
+                {p.id === meId ? "Me" : p.displayName}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
