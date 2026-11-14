@@ -4,36 +4,41 @@ import { useOptimistic, useState, useTransition } from "react";
 import type { BillDTO } from "@/lib/bills";
 import { deleteItem, setClaim } from "@/app/actions";
 import { formatMoney } from "@/lib/money";
+import { isEvenSplit, weightsToPercents } from "@/lib/split";
 import { Avatar } from "@/components/Avatar";
+import { SplitEditor } from "@/components/SplitEditor";
 
 type Bill = NonNullable<BillDTO>;
-type OptimisticClaim = { itemId: string; participantId: string; weight: number };
+type OptimisticClaim = { itemId: string; participantId: string; claimed: boolean };
 
 export function ClaimBoard({ bill, mode }: { bill: Bill; mode: "owner" | "guest" }) {
   const meId = bill.viewer.meId;
   const [actingId, setActingId] = useState<string | null>(meId);
   const [editing, setEditing] = useState(false);
+  const [splitting, setSplitting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
+  // Mirrors setClaim on the server: joining or leaving an item resets it to an even split.
   const [items, applyOptimistic] = useOptimistic(bill.items, (state, c: OptimisticClaim) =>
     state.map((it) => {
       if (it.id !== c.itemId) return it;
       const others = it.claims.filter((x) => x.participantId !== c.participantId);
-      return { ...it, claims: c.weight > 0 ? [...others, { participantId: c.participantId, weight: c.weight }] : others };
+      const next = c.claimed ? [...others, { participantId: c.participantId, weight: 1 }] : others;
+      return { ...it, claims: next.map((x) => ({ ...x, weight: 1 })) };
     }),
   );
 
   const canEdit = mode === "owner" || (meId !== null && bill.status === "OPEN");
   const people = new Map(bill.participants.map((p) => [p.id, p]));
 
-  function change(itemId: string, weight: number) {
+  function toggle(itemId: string, claimed: boolean) {
     if (!actingId || !canEdit) return;
     setError(null);
     startTransition(async () => {
-      applyOptimistic({ itemId, participantId: actingId, weight });
+      applyOptimistic({ itemId, participantId: actingId, claimed });
       try {
-        await setClaim(itemId, actingId, weight);
+        await setClaim(itemId, actingId, claimed);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong");
       }
@@ -95,10 +100,13 @@ export function ClaimBoard({ bill, mode }: { bill: Bill; mode: "owner" | "guest"
       <ul className="card divide-y divide-line !p-0 overflow-hidden">
         {items.map((item) => {
           const mine = item.claims.find((c) => c.participantId === actingId);
-          const totalWeight = item.claims.reduce((a, c) => a + c.weight, 0);
+          const weights = item.claims.map((c) => c.weight);
+          const totalWeight = weights.reduce((a, w) => a + w, 0);
+          const uneven = item.claims.length > 1 && !isEvenSplit(weights);
+          const percents = uneven ? weightsToPercents(weights) : [];
           const myShare = mine && totalWeight ? Math.round((item.priceCents * mine.weight) / totalWeight) : 0;
           const unclaimed = item.claims.length === 0;
-          const interactive = canEdit && !editing;
+          const interactive = canEdit && !editing && splitting !== item.id;
           return (
             <li key={item.id}>
               <div
@@ -106,18 +114,16 @@ export function ClaimBoard({ bill, mode }: { bill: Bill; mode: "owner" | "guest"
                 tabIndex={interactive ? 0 : undefined}
                 aria-checked={interactive ? Boolean(mine) : undefined}
                 aria-label={interactive ? item.name : undefined}
-                onClick={() => interactive && change(item.id, mine ? 0 : 1)}
+                onClick={() => interactive && toggle(item.id, !mine)}
                 onKeyDown={(e) => {
-                  if (interactive && (e.key === "Enter" || e.key === " ")) {
+                  if (interactive && e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
                     e.preventDefault();
-                    change(item.id, mine ? 0 : 1);
+                    toggle(item.id, !mine);
                   }
                 }}
-                className={`flex items-center gap-3 px-4 py-3.5 transition-colors ${
-                  mine ? "bg-accent-soft" : ""
-                } ${interactive ? "cursor-pointer select-none hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none" : ""} ${
-                  mine && interactive ? "hover:!bg-accent-soft" : ""
-                }`}
+                className={`flex items-center gap-3 px-4 py-3.5 transition-colors ${mine ? "bg-accent-soft" : ""} ${
+                  interactive ? "cursor-pointer select-none hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none" : ""
+                } ${mine && interactive ? "hover:!bg-accent-soft" : ""}`}
               >
                 {canEdit && !editing && (
                   <span
@@ -135,18 +141,18 @@ export function ClaimBoard({ bill, mode }: { bill: Bill; mode: "owner" | "guest"
                     <span className="truncate font-medium">{item.name}</span>
                     <span className="money shrink-0 text-sm">{formatMoney(item.priceCents)}</span>
                   </div>
-                  <div className="mt-1 flex min-h-5 flex-wrap items-center gap-1.5">
+                  <div className="mt-1 flex min-h-5 flex-wrap items-center gap-x-2 gap-y-1">
                     {unclaimed ? (
                       <span className="text-xs font-medium text-warn-fg">Unclaimed</span>
                     ) : (
-                      item.claims.map((c) => {
+                      item.claims.map((c, i) => {
                         const p = people.get(c.participantId);
                         if (!p) return null;
                         return (
                           <span key={c.participantId} title={p.displayName} className="inline-flex items-center gap-1 text-xs text-muted">
                             <Avatar id={p.id} name={p.displayName} size="sm" />
                             <span className="max-w-24 truncate">{p.displayName}</span>
-                            {c.weight > 1 && <span>×{c.weight}</span>}
+                            {uneven && <span className="money font-medium text-fg">{percents[i]}%</span>}
                           </span>
                         );
                       })
@@ -168,33 +174,43 @@ export function ClaimBoard({ bill, mode }: { bill: Bill; mode: "owner" | "guest"
                     Remove
                   </button>
                 ) : (
-                  mine &&
-                  canEdit && (
-                    <div className="flex items-center rounded-lg border border-line bg-surface" onClick={(e) => e.stopPropagation()}>
-                      <Stepper label="Fewer shares" onClick={() => change(item.id, mine.weight - 1)}>
-                        −
-                      </Stepper>
-                      <span className="money w-6 text-center text-sm font-medium">{mine.weight}</span>
-                      <Stepper label="More shares" onClick={() => change(item.id, mine.weight + 1)}>
-                        +
-                      </Stepper>
-                    </div>
+                  mode === "owner" && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSplitting(splitting === item.id ? null : item.id);
+                      }}
+                      aria-expanded={splitting === item.id}
+                      className={`shrink-0 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                        splitting === item.id || uneven ? "border-accent text-accent" : "border-line text-muted hover:text-fg"
+                      }`}
+                    >
+                      Split
+                    </button>
                   )
                 )}
               </div>
+
+              {splitting === item.id && (
+                <SplitEditor
+                  key={item.claims.map((c) => `${c.participantId}:${c.weight}`).join(",")}
+                  itemId={item.id}
+                  priceCents={item.priceCents}
+                  people={bill.participants}
+                  claims={item.claims}
+                  onClose={() => setSplitting(null)}
+                />
+              )}
             </li>
           );
         })}
       </ul>
-      {canEdit && <p className="text-xs text-muted">Use − / + if you had more than an even share of something you split.</p>}
+      {mode === "owner" && (
+        <p className="text-xs text-muted">
+          Use Split when people shared something unevenly, e.g. 20% / 80%. Adding or removing someone from an item resets
+          it to an even split.
+        </p>
+      )}
     </section>
-  );
-}
-
-function Stepper({ children, onClick, label }: { children: React.ReactNode; onClick: () => void; label: string }) {
-  return (
-    <button onClick={onClick} aria-label={label} className="grid h-8 w-8 place-items-center text-muted hover:text-fg">
-      {children}
-    </button>
   );
 }

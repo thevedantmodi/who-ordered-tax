@@ -207,3 +207,20 @@ export function splitBill(input: SplitInput): SplitResult {
     shares,
   };
 }
+
+// ---------- Percentage splits ----------
+
+/** Percent shares (e.g. [20, 80]) -> integer claim weights, at basis-point precision. */
+export function percentsToWeights(percents: number[]): number[] {
+  return percents.map((p) => Math.round(p * 100));
+}
+
+/** Claim weights -> percent shares to one decimal place that sum to exactly 100. */
+export function weightsToPercents(weights: number[]): number[] {
+  if (weights.length === 0) return [];
+  return allocate(1000, weights).map((tenths) => tenths / 10);
+}
+
+export function isEvenSplit(weights: number[]): boolean {
+  return weights.every((w) => w === weights[0]);
+}

@@ -10,6 +10,7 @@ import { auth, signIn, signOut } from "@/auth";
 import { db } from "@/lib/db";
 import { guestCookieName, loadBillForAction } from "@/lib/bills";
 import { parseMoney } from "@/lib/money";
+import { percentsToWeights } from "@/lib/split";
 import { isEmoji, randomEmoji } from "@/lib/emoji";
 import { cleanupDemoAccounts, createDemoAccount, demoEnabled } from "@/lib/demo";
 
@@ -299,26 +300,54 @@ export async function claimPlaceholder(shareToken: string, participantId: string
 }
 
 /**
- * Set how many shares of an item a participant has (0 removes the claim).
- * Guests may only change their own claims while the bill is open; the payer can change anyone's.
+ * Claim or unclaim an item for a participant. Guests may only change their own claims while the
+ * bill is open; the payer can change anyone's. A custom split (e.g. 20/80) only makes sense for the
+ * people it was set for, so whenever the group on an item changes, it resets to an even split.
  */
-export async function setClaim(itemId: string, participantId: string, weight: number) {
-  const item = await db.item.findUniqueOrThrow({ where: { id: itemId } });
+export async function setClaim(itemId: string, participantId: string, claimed: boolean) {
+  const item = await db.item.findUniqueOrThrow({ where: { id: itemId }, include: { claims: true } });
   const { bill, viewer } = await loadBillForAction({ id: item.billId });
 
   if (!bill.participants.some((p) => p.id === participantId)) throw new Error("Not on this bill");
   const allowed = viewer.isOwner || (viewer.meId === participantId && bill.status === "OPEN");
   if (!allowed) throw new Error("You can only claim your own items");
 
-  const w = Math.max(0, Math.min(20, Math.floor(weight)));
-  if (w === 0) {
-    await db.claim.deleteMany({ where: { itemId, participantId } });
-  } else {
-    await db.claim.upsert({
-      where: { itemId_participantId: { itemId, participantId } },
-      create: { itemId, participantId, weight: w },
-      update: { weight: w },
-    });
-  }
+  const has = item.claims.some((c) => c.participantId === participantId);
+  if (has === claimed) return;
+
+  await db.$transaction([
+    claimed
+      ? db.claim.create({ data: { itemId, participantId, weight: 1 } })
+      : db.claim.delete({ where: { itemId_participantId: { itemId, participantId } } }),
+    db.claim.updateMany({ where: { itemId }, data: { weight: 1 } }),
+  ]);
+  touch(bill);
+}
+
+const itemSplitSchema = z
+  .array(z.object({ participantId: z.string().min(1), percent: z.number().positive().max(100) }))
+  .min(1)
+  .max(100);
+
+/** Payer only: split an item between specific people by percentage, e.g. 20% / 80%. */
+export async function setItemSplit(itemId: string, shares: { participantId: string; percent: number }[]) {
+  const item = await db.item.findUniqueOrThrow({ where: { id: itemId } });
+  const { bill } = await requireOwner(item.billId);
+  const parsed = itemSplitSchema.parse(shares);
+
+  const onBill = new Set(bill.participants.map((p) => p.id));
+  if (parsed.some((s) => !onBill.has(s.participantId))) throw new Error("Not on this bill");
+  if (new Set(parsed.map((s) => s.participantId)).size !== parsed.length) throw new Error("Someone is listed twice");
+  const total = parsed.reduce((a, s) => a + s.percent, 0);
+  if (Math.abs(total - 100) > 0.01) throw new Error("Shares must add up to 100%");
+  const weights = percentsToWeights(parsed.map((s) => s.percent));
+  if (weights.some((w) => w < 1)) throw new Error("Each share must be at least 0.01%");
+
+  await db.$transaction([
+    db.claim.deleteMany({ where: { itemId } }),
+    db.claim.createMany({
+      data: parsed.map((s, i) => ({ itemId, participantId: s.participantId, weight: weights[i] })),
+    }),
+  ]);
   touch(bill);
 }

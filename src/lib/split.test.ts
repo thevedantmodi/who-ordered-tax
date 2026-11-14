@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allocate, splitBill, type SplitInput } from "./split";
+import { allocate, isEvenSplit, percentsToWeights, splitBill, weightsToPercents, type SplitInput } from "./split";
 
 const base: Omit<SplitInput, "participants" | "items"> = {
   taxCents: 0,
@@ -236,5 +236,48 @@ describe("splitBill", () => {
       });
       expect(sum(r.shares.map((s) => s.totalCents))).toBe(r.totalCents);
     }
+  });
+});
+
+describe("percentage splits", () => {
+  it("converts percents to weights and back", () => {
+    expect(percentsToWeights([20, 80])).toEqual([2000, 8000]);
+    expect(percentsToWeights([12.5, 87.5])).toEqual([1250, 8750]);
+    expect(weightsToPercents([2000, 8000])).toEqual([20, 80]);
+    expect(weightsToPercents([1, 1, 2])).toEqual([25, 25, 50]);
+  });
+
+  it("shows thirds as percents that still add up to 100", () => {
+    const pct = weightsToPercents([1, 1, 1]);
+    expect(pct).toEqual([33.4, 33.3, 33.3]);
+    expect(pct.reduce((a, b) => a + b, 0)).toBeCloseTo(100);
+  });
+
+  it("detects even splits", () => {
+    expect(isEvenSplit([1, 1, 1])).toBe(true);
+    expect(isEvenSplit([2000, 8000])).toBe(false);
+  });
+
+  it("bills a 20/80 dish to the cent", () => {
+    const r = splitBill({
+      ...base,
+      participants: [{ id: "me", isPayer: true }, { id: "john" }],
+      items: [
+        {
+          id: "dish",
+          priceCents: 2499,
+          claims: [
+            { participantId: "me", weight: 2000 },
+            { participantId: "john", weight: 8000 },
+          ],
+        },
+      ],
+      taxMode: "PERCENT",
+      taxPercent: 10,
+    });
+    // 2499 * 20% = 499.8 -> 500, 2499 * 80% = 1999.2 -> 1999
+    expect(r.shares.map((s) => s.itemsCents)).toEqual([500, 1999]);
+    expect(r.shares.map((s) => s.taxCents)).toEqual([50, 200]);
+    expect(sum(r.shares.map((s) => s.totalCents))).toBe(r.totalCents);
   });
 });

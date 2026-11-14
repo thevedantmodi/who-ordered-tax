@@ -19,7 +19,7 @@
 1. **Payer signs in** (magic link or Google) and creates a bill.
 2. **Itemize**: add line items with prices, then tax, tip (amount, % pre-tax or % post-tax), fees and discounts.
 3. **Share link**: `/b/<token>` — anyone with it can join with just a name, no account.
-4. **Select your items**: tap to claim; shared items (the nachos) split evenly between everyone who tapped. Claims support weights (I had 2 of the 3 beers).
+4. **Select your items**: tap to claim; shared items (the nachos) split evenly between everyone who tapped. The payer can split any item by percentage (I had 20% of the nachos, John had 80%); changing who shared an item resets it to even.
 5. **Live breakdown**: each person sees items + their share of tax, tip, fees, discount = total owed, live.
 6. **Settle**: payer marks people paid; bill auto-flips to settled when everyone is square.
 

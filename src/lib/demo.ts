@@ -108,6 +108,7 @@ export async function createDemoAccount() {
       { name: "Carne asada plate", price: 1800, who: { Alex: 1 } },
       { name: "Fish tacos", price: 1650, who: { Priya: 1 } },
       { name: "Veggie burrito", price: 1400, who: { Jordan: 1 } },
+      { name: "Loaded nachos", price: 1400, who: { Alex: 2000, Jordan: 8000 } },
       { name: "Guacamole", price: 1200, who: { Alex: 1, Priya: 1, Sam: 2 } },
       { name: "Margarita", price: 1100, who: { Priya: 1 } },
       { name: "Margarita", price: 1100, who: { Sam: 1 } },
