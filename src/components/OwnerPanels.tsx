@@ -338,7 +338,7 @@ export function PeoplePanel({ bill }: { bill: Bill }) {
       <ul className="divide-y divide-line">
         {bill.participants.map((p) => (
           <li key={p.id} className="flex items-center gap-3 py-2.5">
-            <Avatar id={p.id} name={p.displayName} />
+            <Avatar name={p.displayName} color={p.color} />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-medium">{p.displayName}</span>
               <span className="text-xs text-muted">{p.isPayer ? "Payer" : p.isPlaceholder ? "Hasn't opened the link" : "Joined"}</span>

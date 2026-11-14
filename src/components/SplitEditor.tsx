@@ -1,13 +1,48 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { setItemSplit } from "@/app/actions";
 import { formatMoney } from "@/lib/money";
 import { isEvenSplit, weightsToPercents } from "@/lib/split";
 import { Avatar } from "@/components/Avatar";
 
-type Person = { id: string; displayName: string };
+type Person = { id: string; displayName: string; color: number };
 type Claim = { participantId: string; weight: number };
+
+/**
+ * FLIP animation for a reordering list: after each reorder, measure where every row moved from and
+ * slide it there smoothly. Positions are relative to the list (offsetTop), so scrolling the page
+ * between renders doesn't cause spurious motion. Skipped for prefers-reduced-motion.
+ */
+function useFlipList(order: string) {
+  const nodes = useRef(new Map<string, HTMLElement>());
+  const last = useRef(new Map<string, number>());
+
+  useLayoutEffect(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const next = new Map<string, number>();
+    nodes.current.forEach((el, key) => {
+      const top = el.offsetTop;
+      next.set(key, top);
+      const before = last.current.get(key);
+      if (reduce || before === undefined || before === top) return;
+      el.getAnimations().forEach((a) => a.cancel());
+      el.animate([{ transform: `translateY(${before - top}px)` }, { transform: "translateY(0)" }], {
+        duration: 320,
+        easing: "cubic-bezier(0.2, 0, 0, 1)",
+      });
+    });
+    last.current = next;
+  }, [order]);
+
+  return useCallback(
+    (key: string) => (el: HTMLElement | null) => {
+      if (el) nodes.current.set(key, el);
+      else nodes.current.delete(key);
+    },
+    [],
+  );
+}
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const fmt = (n: number) => String(round2(n));
@@ -44,6 +79,9 @@ export function SplitEditor({
   const [error, setError] = useState<string | null>(null);
 
   const ordered = people.filter((p) => included.includes(p.id));
+  // People in the split first; everyone else slides to the end.
+  const listed = [...ordered, ...people.filter((p) => !included.includes(p.id))];
+  const flipRef = useFlipList(listed.map((p) => p.id).join("|"));
   const num = (id: string) => Number((values[id] ?? "").replace(/[%\s]/g, "")) || 0;
   const total = round2(ordered.reduce((a, p) => a + num(p.id), 0));
   const remaining = round2(100 - total);
@@ -92,11 +130,11 @@ export function SplitEditor({
 
   return (
     <div className="space-y-3 bg-surface-2/60 px-4 pb-4 pt-3" onClick={(e) => e.stopPropagation()}>
-      <ul className="space-y-1.5">
-        {people.map((p) => {
+      <ul className="relative space-y-1.5">
+        {listed.map((p) => {
           const on = included.includes(p.id);
           return (
-            <li key={p.id} className="flex items-center gap-2.5">
+            <li key={p.id} ref={flipRef(p.id)} className="flex min-h-9 items-center gap-2.5">
               <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5">
                 <input
                   type="checkbox"
@@ -104,7 +142,7 @@ export function SplitEditor({
                   onChange={() => toggle(p.id)}
                   className="h-4 w-4 shrink-0 accent-[var(--accent)]"
                 />
-                <Avatar id={p.id} name={p.displayName} size="sm" />
+                <Avatar name={p.displayName} color={p.color} size="sm" />
                 <span className={`truncate text-sm ${on ? "" : "text-muted"}`}>{p.displayName}</span>
               </label>
               {on && (

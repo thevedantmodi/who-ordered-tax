@@ -15,7 +15,7 @@ const billInclude = {
     include: { claims: { select: { participantId: true, weight: true } } },
   },
   participants: {
-    orderBy: { createdAt: "asc" as const },
+    orderBy: [{ createdAt: "asc" as const }, { id: "asc" as const }],
     select: {
       id: true,
       displayName: true,
@@ -88,8 +88,10 @@ function toDTO(bill: RawBill, viewer: Awaited<ReturnType<typeof resolveViewer>>)
       priceCents: i.priceCents,
       claims: i.claims,
     })),
-    participants: bill.participants.map((p) => ({
+    participants: bill.participants.map((p, i) => ({
       id: p.id,
+      /** Position on the bill; picks this person's color everywhere. */
+      color: i,
       displayName: p.displayName,
       emoji: p.emoji,
       isPayer: p.isPayer,

@@ -329,10 +329,15 @@ const itemSplitSchema = z
   .min(1)
   .max(100);
 
-/** Payer only: split an item between specific people by percentage, e.g. 20% / 80%. */
+/**
+ * Split an item between specific people by percentage, e.g. 20% / 80%. The payer can do this any
+ * time; anyone who has joined the bill can do it while it's open (same rule as claiming).
+ */
 export async function setItemSplit(itemId: string, shares: { participantId: string; percent: number }[]) {
   const item = await db.item.findUniqueOrThrow({ where: { id: itemId } });
-  const { bill } = await requireOwner(item.billId);
+  const { bill, viewer } = await loadBillForAction({ id: item.billId });
+  const allowed = viewer.isOwner || (viewer.meId !== null && bill.status === "OPEN");
+  if (!allowed) throw new Error(bill.status === "OPEN" ? "Join the bill to split items" : "This bill is locked");
   const parsed = itemSplitSchema.parse(shares);
 
   const onBill = new Set(bill.participants.map((p) => p.id));

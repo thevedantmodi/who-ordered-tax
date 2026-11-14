@@ -18,7 +18,7 @@ export default async function Bills() {
     orderBy: { createdAt: "desc" },
     include: {
       items: { select: { priceCents: true } },
-      participants: { select: { id: true, displayName: true }, orderBy: { createdAt: "asc" } },
+      participants: { select: { id: true, displayName: true }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
     },
     take: 100,
   });

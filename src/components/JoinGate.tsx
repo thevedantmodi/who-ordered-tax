@@ -48,7 +48,7 @@ export function JoinGate({ bill, defaultName }: { bill: Bill; defaultName?: stri
                 onClick={() => run(() => claimPlaceholder(bill.shareToken, p.id))}
                 className="btn btn-secondary justify-start"
               >
-                <Avatar id={p.id} name={p.displayName} size="sm" />
+                <Avatar name={p.displayName} color={p.color} size="sm" />
                 I&apos;m {p.displayName}
               </button>
             ))}

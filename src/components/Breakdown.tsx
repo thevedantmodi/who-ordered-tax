@@ -39,7 +39,7 @@ export function Breakdown({ bill, mode }: { bill: Bill; mode: "owner" | "guest" 
                 aria-expanded={expanded}
                 className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-2"
               >
-                <Avatar id={p.id} name={p.displayName} />
+                <Avatar name={p.displayName} color={p.color} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">
                     {p.displayName}

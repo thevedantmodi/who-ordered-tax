@@ -5,7 +5,7 @@ import type { BillDTO } from "@/lib/bills";
 import { deleteItem, setClaim } from "@/app/actions";
 import { formatMoney } from "@/lib/money";
 import { isEvenSplit, weightsToPercents } from "@/lib/split";
-import { Avatar } from "@/components/Avatar";
+import { personColor } from "@/components/Avatar";
 import { SplitEditor } from "@/components/SplitEditor";
 
 type Bill = NonNullable<BillDTO>;
@@ -141,7 +141,7 @@ export function ClaimBoard({ bill, mode }: { bill: Bill; mode: "owner" | "guest"
                     <span className="truncate font-medium">{item.name}</span>
                     <span className="money shrink-0 text-sm">{formatMoney(item.priceCents)}</span>
                   </div>
-                  <div className="mt-1 flex min-h-5 flex-wrap items-center gap-x-2 gap-y-1">
+                  <div className="mt-1.5 flex min-h-5 flex-wrap items-center gap-1">
                     {unclaimed ? (
                       <span className="text-xs font-medium text-warn-fg">Unclaimed</span>
                     ) : (
@@ -149,10 +149,13 @@ export function ClaimBoard({ bill, mode }: { bill: Bill; mode: "owner" | "guest"
                         const p = people.get(c.participantId);
                         if (!p) return null;
                         return (
-                          <span key={c.participantId} title={p.displayName} className="inline-flex items-center gap-1 text-xs text-muted">
-                            <Avatar id={p.id} name={p.displayName} size="sm" />
+                          <span
+                            key={c.participantId}
+                            title={p.displayName}
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${personColor(p.color)}`}
+                          >
                             <span className="max-w-24 truncate">{p.displayName}</span>
-                            {uneven && <span className="money font-medium text-fg">{percents[i]}%</span>}
+                            {uneven && <span className="money font-semibold">{percents[i]}%</span>}
                           </span>
                         );
                       })
@@ -174,7 +177,7 @@ export function ClaimBoard({ bill, mode }: { bill: Bill; mode: "owner" | "guest"
                     Remove
                   </button>
                 ) : (
-                  mode === "owner" && (
+                  canEdit && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -205,7 +208,7 @@ export function ClaimBoard({ bill, mode }: { bill: Bill; mode: "owner" | "guest"
           );
         })}
       </ul>
-      {mode === "owner" && (
+      {canEdit && (
         <p className="text-xs text-muted">
           Use Split when people shared something unevenly, e.g. 20% / 80%. Adding or removing someone from an item resets
           it to an even split.
