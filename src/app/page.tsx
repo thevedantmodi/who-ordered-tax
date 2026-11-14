@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
-import { DemoButton } from "@/components/DemoButton";
 
 const steps = [
   { title: "Enter the receipt", body: "Add items, tax, tip and any fees." },
@@ -27,7 +26,9 @@ export default async function Home() {
           <Link href="/login?callbackUrl=/bills/new" className="btn btn-primary px-5 py-3 text-base">
             Split a bill
           </Link>
-          <DemoButton className="btn btn-secondary px-5 py-3 text-base" />
+          <Link href="/login" className="btn btn-secondary px-5 py-3 text-base">
+            Sign in
+          </Link>
         </div>
       </section>
 
