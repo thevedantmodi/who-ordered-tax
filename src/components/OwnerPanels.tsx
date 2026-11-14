@@ -180,7 +180,7 @@ export function ChargesForm({ bill }: { bill: Bill }) {
       }}
       className="card space-y-4"
     >
-      <h2 className="section-title">Tax, tip and fees</h2>
+      <h2 className="section-title">Tax, fees and tip</h2>
 
       <div>
         <span className="label">Tax</span>
@@ -229,6 +229,20 @@ export function ChargesForm({ bill }: { bill: Bill }) {
               : `≈ ${trim(impliedRate, 2)}% of ${formatMoney(taxBase)}`}
           </p>
         )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="label">Fees</span>
+          <input name="fees" inputMode="decimal" defaultValue={cents(bill.feesCents)} placeholder="0.00" className="input money" />
+        </label>
+        <label className="block">
+          <span className="label">Split fees</span>
+          <select name="feeMode" defaultValue={bill.feeMode} className="input">
+            <option value="PROPORTIONAL">Proportionally</option>
+            <option value="EVEN">Evenly</option>
+          </select>
+        </label>
       </div>
 
       <div>
@@ -283,20 +297,6 @@ export function ChargesForm({ bill }: { bill: Bill }) {
               </button>
             ))}
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <label className="block">
-          <span className="label">Fees</span>
-          <input name="fees" inputMode="decimal" defaultValue={cents(bill.feesCents)} placeholder="0.00" className="input money" />
-        </label>
-        <label className="block">
-          <span className="label">Split fees</span>
-          <select name="feeMode" defaultValue={bill.feeMode} className="input">
-            <option value="PROPORTIONAL">Proportionally</option>
-            <option value="EVEN">Evenly</option>
-          </select>
-        </label>
       </div>
 
       <label className="block">

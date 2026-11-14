@@ -15,6 +15,10 @@ export function Breakdown({ bill, mode }: { bill: Bill; mode: "owner" | "guest" 
   const payer = bill.participants.find((p) => p.isPayer);
   const shareById = new Map(split.shares.map((s) => [s.participantId, s]));
   const itemName = new Map(bill.items.map((i) => [i.id, i.name]));
+  // Tax and fees are shown as one line (tip stays separate, discount comes last).
+  const hasTax = split.taxCents !== 0;
+  const hasFees = bill.feesCents !== 0;
+  const taxFeesLabel = hasTax && hasFees ? "Tax & fees" : hasFees ? "Fees" : "Tax";
 
   return (
     <section className="space-y-3">
@@ -64,9 +68,8 @@ export function Breakdown({ bill, mode }: { bill: Bill; mode: "owner" | "guest" 
                     {Object.keys(s.itemBreakdown).length === 0 && <p className="text-muted">No items claimed.</p>}
                     <div className="my-2 h-px bg-line" />
                     <Row label="Items" value={s.itemsCents} />
-                    {s.taxCents !== 0 && <Row label="Tax" value={s.taxCents} />}
+                    {s.taxCents + s.feesCents !== 0 && <Row label={taxFeesLabel} value={s.taxCents + s.feesCents} />}
                     {s.tipCents !== 0 && <Row label="Tip" value={s.tipCents} />}
-                    {s.feesCents !== 0 && <Row label="Fees" value={s.feesCents} />}
                     {s.discountCents !== 0 && <Row label="Discount" value={-s.discountCents} />}
                     <Row label="Total" value={s.totalCents} bold />
                   </dl>
@@ -93,8 +96,11 @@ export function Breakdown({ bill, mode }: { bill: Bill; mode: "owner" | "guest" 
 
       <dl className="card money space-y-1.5 text-sm">
         <Row label="Subtotal" value={split.subtotalCents} />
-        {split.taxCents !== 0 && (
-          <Row label={bill.taxMode === "PERCENT" ? `Tax (${bill.taxPercent}%)` : "Tax"} value={split.taxCents} />
+        {split.taxCents + bill.feesCents !== 0 && (
+          <Row
+            label={hasFees || bill.taxMode !== "PERCENT" ? taxFeesLabel : `Tax (${bill.taxPercent}%)`}
+            value={split.taxCents + bill.feesCents}
+          />
         )}
         {split.tipCents !== 0 && (
           <Row
@@ -102,7 +108,6 @@ export function Breakdown({ bill, mode }: { bill: Bill; mode: "owner" | "guest" 
             value={split.tipCents}
           />
         )}
-        {bill.feesCents !== 0 && <Row label="Fees" value={bill.feesCents} />}
         {bill.discountCents !== 0 && <Row label="Discount" value={-bill.discountCents} />}
         <div className="my-2 h-px bg-line" />
         <Row label="Total" value={split.totalCents} bold />
