@@ -41,7 +41,11 @@ export async function signInWithEmail(formData: FormData) {
   const email = z.string().trim().toLowerCase().email().safeParse(formData.get("email"));
   if (!email.success) redirect("/login?error=email");
   const callbackUrl = z.string().startsWith("/").catch("/bills").parse(formData.get("callbackUrl") ?? "/bills");
-  await signIn("email", { email: email.data, redirectTo: callbackUrl, redirect: false });
+  // With redirect: false, Auth.js reports failures (e.g. the email provider rejecting the send) by
+  // returning a URL with ?error=… rather than throwing, so check before claiming the email went out.
+  const result = await signIn("email", { email: email.data, redirectTo: callbackUrl, redirect: false });
+  const failed = typeof result === "string" && new URL(result, "http://localhost").searchParams.has("error");
+  if (failed) redirect(`/login?error=send&callbackUrl=${encodeURIComponent(callbackUrl)}`);
   redirect("/login/check");
 }
 

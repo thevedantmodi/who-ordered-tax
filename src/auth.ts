@@ -17,6 +17,10 @@ const magicLink: EmailConfig = {
   async sendVerificationRequest({ identifier, url }) {
     const key = process.env.RESEND_API_KEY;
     if (!key) {
+      // Never pretend an email was sent in production: without a key nobody could sign in.
+      if (process.env.NODE_ENV === "production" && process.env.VERCEL) {
+        throw new Error("RESEND_API_KEY is not set, so sign-in emails can't be sent");
+      }
       console.log(`\n🔗 Magic link for ${identifier}:\n${url}\n`);
       return;
     }

@@ -18,7 +18,13 @@ export default async function Login({ searchParams }: PageProps<"/login">) {
       </div>
 
       {error && (
-        <p className="notice">{error === "email" ? "That email address doesn't look right." : "Something went wrong. Please try again."}</p>
+        <p className="notice">
+          {error === "email"
+            ? "That email address doesn't look right."
+            : error === "send"
+              ? "We couldn't send the sign-in email. Please try again in a minute."
+              : "Something went wrong. Please try again."}
+        </p>
       )}
 
       <form action={signInWithEmail} className="space-y-3">
