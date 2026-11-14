@@ -12,7 +12,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Who Ordered Tax?", template: "%s · Who Ordered Tax?" },
+  title: { default: "Who Ordered The Tax?", template: "%s · Who Ordered The Tax?" },
   description: "Itemized bill splitting. Everyone pays for what they ordered, plus their share of tax and tip.",
   appleWebApp: { capable: true, title: "WhoTax", statusBarStyle: "default" },
 };

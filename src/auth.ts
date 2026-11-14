@@ -24,11 +24,11 @@ const magicLink: EmailConfig = {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM ?? "Who Ordered Tax <onboarding@resend.dev>",
+        from: process.env.EMAIL_FROM ?? "Who Ordered The Tax? <onboarding@resend.dev>",
         to: identifier,
         subject: "Your sign-in link 🧾",
-        text: `Tap to sign in to Who Ordered Tax:\n\n${url}\n\nIf you didn't ask for this, ignore it.`,
-        html: `<p>Tap to sign in to <b>Who Ordered Tax</b>:</p><p><a href="${url}">Sign in</a></p><p>If you didn't ask for this, ignore it.</p>`,
+        text: `Tap to sign in to Who Ordered The Tax?\n\n${url}\n\nIf you didn't ask for this, ignore it.`,
+        html: `<p>Tap to sign in to <b>Who Ordered The Tax?</b></p><p><a href="${url}">Sign in</a></p><p>If you didn't ask for this, ignore it.</p>`,
       }),
     });
     if (!res.ok) throw new Error(`Resend error: ${res.status} ${await res.text()}`);

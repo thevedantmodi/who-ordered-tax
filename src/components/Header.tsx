@@ -10,7 +10,7 @@ function Frame({ home, right, banner }: { home: string; right?: ReactNode; banne
       <div className="mx-auto flex max-w-xl items-center justify-between px-4 py-3">
         <Link href={home} className="flex items-center gap-2 font-semibold tracking-tight">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent text-xs font-bold text-accent-fg">%</span>
-          Who Ordered Tax
+          Who Ordered The Tax?
         </Link>
         {right}
       </div>

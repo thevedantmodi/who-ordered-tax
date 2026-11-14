@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Who Ordered Tax?",
+    name: "Who Ordered The Tax?",
     short_name: "WhoTax",
     description: "Itemized bill splitting, to the cent.",
     start_url: "/bills",

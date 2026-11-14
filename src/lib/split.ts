@@ -1,5 +1,5 @@
 /**
- * The "who ordered tax" engine.
+ * The "who ordered the tax?" engine.
  *
  * Pure functions, integer cents only. Every allocation uses largest-remainder
  * rounding so per-person totals always sum exactly to the bill total.

@@ -1,4 +1,4 @@
-# 🧾 Who Ordered Tax?
+# 🧾 Who Ordered The Tax?
 
 Splitwise, but the bill splits itself. Itemize a receipt, drop a link in the group chat, and everyone taps what they had. Tax, tip, fees and discounts get split by what each person ordered, to the exact cent.
 

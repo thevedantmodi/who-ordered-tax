@@ -1,4 +1,4 @@
-# Who Ordered Tax? — Product Spec
+# Who Ordered The Tax? — Product Spec
 
 > Splitwise, but the bill splits itself. Everyone pays for what they ordered, plus their fair share of tax and tip.
 
@@ -23,7 +23,7 @@
 5. **Live breakdown**: each person sees items + their share of tax, tip, fees, discount = total owed, live.
 6. **Settle**: payer marks people paid; bill auto-flips to settled when everyone is square.
 
-### Split rules (the "who ordered tax" engine)
+### Split rules (the "who ordered the tax?" engine)
 
 - All money is integer cents. Every allocation uses largest-remainder rounding, so **per-person totals always sum exactly to the receipt total** — no orphan pennies.
 - Item cost is split among claimants by weight.
