@@ -22,6 +22,8 @@ model User {
   sessions      Session[]
   billsOwned    Bill[]        @relation("BillOwner")
   participants  Participant[]
+  groupsCreated Group[]       @relation("GroupCreator")
+  memberships   GroupMember[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -93,8 +95,11 @@ enum UnclaimedPolicy {
 
 model Bill {
   id              String          @id @default(cuid())
-  ownerId         String
-  owner           User            @relation("BillOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  /// Creator. Optional because any group member (including guests) can add a bill to a group.
+  ownerId         String?
+  owner           User?           @relation("BillOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  groupId         String?
+  group           Group?          @relation(fields: [groupId], references: [id], onDelete: SetNull)
   title           String
   merchant        String?
   date            DateTime        @default(now())
@@ -116,6 +121,7 @@ model Bill {
   updatedAt       DateTime        @updatedAt
 
   @@index([ownerId])
+  @@index([groupId])
 }
 
 model Item {
@@ -137,6 +143,9 @@ model Participant {
   bill        Bill      @relation(fields: [billId], references: [id], onDelete: Cascade)
   userId      String?
   user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// On group bills, the group member this participant is.
+  memberId    String?
+  member      GroupMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
   displayName String
   emoji       String    @default("🦝")
   isPayer     Boolean   @default(false)
@@ -147,6 +156,7 @@ model Participant {
   createdAt   DateTime  @default(now())
 
   @@unique([billId, userId])
+  @@unique([billId, memberId])
   @@index([billId])
 }
 
@@ -158,4 +168,54 @@ model Claim {
   weight        Int         @default(1)
 
   @@id([itemId, participantId])
+}
+
+// ---------- Groups ----------
+
+model Group {
+  id            String        @id @default(cuid())
+  name          String
+  shareToken    String        @unique
+  createdById   String?
+  createdBy     User?         @relation("GroupCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  /// Settle up with the fewest payments (true) or pay back people directly (false).
+  simplifyDebts Boolean       @default(true)
+  members       GroupMember[]
+  bills         Bill[]
+  payments      Payment[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model GroupMember {
+  id           String        @id @default(cuid())
+  groupId      String
+  group        Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId       String?
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  displayName  String
+  /// Random secret stored in an httpOnly cookie to identify guests across the group's bills.
+  guestSecret  String?       @unique
+  participants Participant[]
+  paymentsFrom Payment[]     @relation("PaymentFrom")
+  paymentsTo   Payment[]     @relation("PaymentTo")
+  createdAt    DateTime      @default(now())
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+}
+
+model Payment {
+  id           String      @id @default(cuid())
+  groupId      String
+  group        Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  fromMemberId String
+  from         GroupMember @relation("PaymentFrom", fields: [fromMemberId], references: [id], onDelete: Cascade)
+  toMemberId   String
+  to           GroupMember @relation("PaymentTo", fields: [toMemberId], references: [id], onDelete: Cascade)
+  amountCents  Int
+  note         String?
+  createdAt    DateTime    @default(now())
+
+  @@index([groupId])
 }

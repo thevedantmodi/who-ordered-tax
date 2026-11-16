@@ -8,6 +8,8 @@ import { Breakdown } from "@/components/Breakdown";
 import { JoinGate } from "@/components/JoinGate";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { AddItemForm, BillActions, ChargesForm, PeoplePanel, ShareCard } from "@/components/OwnerPanels";
+import { AddMeBanner, GroupCrumb, MoveToGroupCard, PaidByCard } from "@/components/GroupBillPanels";
+import { loadGroupsForMove } from "@/lib/groups";
 
 export const metadata = { title: "Bill", robots: { index: false } };
 
@@ -20,17 +22,30 @@ export default async function BillPage({ params }: PageProps<"/b/[token]">) {
   const bill = await loadBill({ shareToken: token });
   if (!bill) notFound();
 
-  if (bill.viewer.isOwner) {
+  if (bill.viewer.canManage) {
+    // Standalone bills can be moved into one of the payer's groups.
+    const moveGroups =
+      !bill.group && bill.viewer.userId
+        ? (await loadGroupsForMove(bill.viewer.userId)).map((g) => ({
+            id: g.id,
+            name: g.name,
+            members: g.members.map((m) => ({ id: m.id, displayName: m.displayName, isYou: m.userId === bill.viewer.userId })),
+          }))
+        : [];
     return (
       <div className="space-y-6">
         <AutoRefresh />
+        {bill.group && <GroupCrumb group={bill.group} />}
+        {bill.group && !bill.viewer.meId && <AddMeBanner bill={bill} />}
         <BillHeader bill={bill} />
+        {bill.group && <PaidByCard bill={bill} />}
         <ShareCard bill={bill} />
         <AddItemForm billId={bill.id} />
         <ClaimBoard bill={bill} mode="owner" />
         <ChargesForm bill={bill} />
         <PeoplePanel bill={bill} />
         <Breakdown bill={bill} mode="owner" />
+        {moveGroups.length > 0 && <MoveToGroupCard bill={bill} groups={moveGroups} />}
         <BillActions bill={bill} />
       </div>
     );
@@ -42,6 +57,7 @@ export default async function BillPage({ params }: PageProps<"/b/[token]">) {
   return (
     <div className="space-y-6">
       <AutoRefresh />
+      {bill.group && <GroupCrumb group={bill.group} />}
       {!joined && bill.status === "OPEN" ? (
         <JoinGate bill={bill} defaultName={session?.user?.name ?? undefined} />
       ) : (

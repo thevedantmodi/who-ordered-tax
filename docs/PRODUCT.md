@@ -32,13 +32,30 @@
 - Tip modes: fixed amount, % of pre-tax subtotal, % of post-tax total.
 - Unclaimed items: split evenly among everyone (default) or left on the payer — the bill shows an "unclaimed" notice either way.
 
-## v2 — Groups & balances
+## Groups (shipped)
 
-- Groups (roommates, trips) with running balances across bills
-- Debt simplification (opt-in; some people prefer pairwise)
-- Recurring expenses (rent, utilities, subscriptions) with weighted splits (room size, income ratio, nights stayed)
-- Trip mode: budget, daily spend, multi-currency at the date-of-expense rate, end-of-trip settle-up
-- Non-receipt expenses: "Uber 34 split with Sam and Priya" natural-language entry
+A group is a set of people sharing expenses over time (a trip, roommates). Bills go into the group and
+everyone keeps a running balance; **Settle up** lists the payments that clear it.
+
+- **Group link** `/g/<token>`: join once with a name (no account). Members are recognised on every
+  group bill, by account or a per-group guest cookie.
+- **Anyone in the group** can add bills (itemized or a quick "Uber $30, split evenly" expense), edit
+  group bills, set **Paid by**, and record payments (partial amounts OK, with undo).
+- **Balances**: each group bill's per-person totals (the same split engine as standalone bills) are
+  owed to whoever paid; recorded payments move money back.
+- **Simplify debts** (per-group setting, on by default): settle in the fewest payments (greedy
+  largest-debtor/largest-creditor, at most n−1). Off: everyone pays back the people they shared bills
+  with, netted per pair.
+- **Move a bill into a group**: match each person to a group member (or add them). Anyone already
+  marked paid on the bill becomes a recorded payment so nothing is counted twice.
+- Group bills have no per-bill "mark as paid" or lock; standalone bills work as before.
+- Creating a group needs an account; members can be guests.
+
+### Later
+- Recurring expenses (rent, utilities, subscriptions) with weighted splits (room size, nights stayed)
+- Trip mode: budget, daily spend, multi-currency, end-of-trip summary
+- Bills with more than one payer (enter as two expenses for now)
+- Removing members, deleting groups
 
 ## v3 — The magic
 

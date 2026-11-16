@@ -50,7 +50,15 @@ export function Breakdown({ bill, mode }: { bill: Bill; mode: "owner" | "guest" 
                     {isMe && <span className="font-normal text-muted"> (you)</span>}
                   </span>
                   <span className="text-xs text-muted">
-                    {p.isPayer ? "Paid the bill" : p.paidAt ? <span className="text-accent">Paid back</span> : "Owes"}
+                    {p.isPayer ? (
+                      "Paid the bill"
+                    ) : bill.group ? (
+                      "Share"
+                    ) : p.paidAt ? (
+                      <span className="text-accent">Paid back</span>
+                    ) : (
+                      "Owes"
+                    )}
                   </span>
                 </span>
                 <span className="money font-semibold">{formatMoney(s.totalCents)}</span>
@@ -73,13 +81,16 @@ export function Breakdown({ bill, mode }: { bill: Bill; mode: "owner" | "guest" 
                     {s.discountCents !== 0 && <Row label="Discount" value={-s.discountCents} />}
                     <Row label="Total" value={s.totalCents} bold />
                   </dl>
-                  {!p.isPayer && payer && (
+                  {bill.group && !p.isPayer && (
+                    <p className="mt-3 text-muted">Counted in the {bill.group.name} balance.</p>
+                  )}
+                  {!bill.group && !p.isPayer && payer && (
                     <p className="mt-3 text-muted">
                       {isMe ? "You owe" : `${p.displayName} owes`} {payer.id === bill.viewer.meId ? "you" : payer.displayName}{" "}
                       <span className="money font-medium text-fg">{formatMoney(s.totalCents)}</span>.
                     </p>
                   )}
-                  {mode === "owner" && !p.isPayer && (
+                  {mode === "owner" && !bill.group && !p.isPayer && (
                     <button
                       onClick={() => startTransition(() => setPaid(p.id, !p.paidAt))}
                       className={`btn mt-3 w-full ${p.paidAt ? "btn-secondary" : "btn-primary"}`}

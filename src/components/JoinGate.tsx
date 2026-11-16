@@ -35,7 +35,10 @@ export function JoinGate({ bill, defaultName }: { bill: Bill; defaultName?: stri
         </p>
       </div>
 
-      <p className="text-sm">Join to select what you had. Your share of tax and tip is calculated automatically.</p>
+      <p className="text-sm">
+        Join to select what you had. Your share of tax and tip is calculated automatically.
+        {bill.group && ` You'll also join ${bill.group.name}, so you're recognized on its other bills.`}
+      </p>
 
       {placeholders.length > 0 && (
         <div>

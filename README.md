@@ -11,6 +11,7 @@ See [`docs/PRODUCT.md`](docs/PRODUCT.md) for the product spec and roadmap.
 - Share link `/b/<token>`: guests join with just a name, no account, or pick a placeholder the payer added ("I'm Sam").
 - Tap to claim items. Shared items split evenly, or anyone on the bill can set an uneven split by percentage (e.g. 20% / 80%). Live updates via polling.
 - Per-person breakdown. The payer marks people paid, and the bill auto-settles when everyone has paid.
+- Groups: a shared link for a trip or roommates. Anyone in the group adds itemized bills or quick expenses and picks who paid; balances roll up, and Settle up lists the fewest payments (or pairwise payments, per group setting). Record payments with undo, and move existing bills into a group.
 - Installable PWA (manifest, icons, service worker with offline page).
 
 ## Stack

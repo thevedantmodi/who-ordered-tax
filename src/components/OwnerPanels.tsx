@@ -11,7 +11,7 @@ import {
   updateCharges,
 } from "@/app/actions";
 import { formatMoney } from "@/lib/money";
-import { Avatar } from "@/components/Avatar";
+import { Avatar, personColor } from "@/components/Avatar";
 
 type Bill = NonNullable<BillDTO>;
 
@@ -333,7 +333,11 @@ export function PeoplePanel({ bill }: { bill: Bill }) {
     <div className="card space-y-4">
       <div>
         <h2 className="section-title">People</h2>
-        <p className="text-sm text-muted">People can join from the link, or you can add them here and select items for them.</p>
+        <p className="text-sm text-muted">
+          {bill.group
+            ? `Add people from ${bill.group.name}, or someone new (they'll join the group too).`
+            : "People can join from the link, or you can add them here and select items for them."}
+        </p>
       </div>
       <ul className="divide-y divide-line">
         {bill.participants.map((p) => (
@@ -341,7 +345,9 @@ export function PeoplePanel({ bill }: { bill: Bill }) {
             <Avatar name={p.displayName} color={p.color} />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-medium">{p.displayName}</span>
-              <span className="text-xs text-muted">{p.isPayer ? "Payer" : p.isPlaceholder ? "Hasn't opened the link" : "Joined"}</span>
+              <span className="text-xs text-muted">
+                {p.isPayer ? "Paid" : p.isPlaceholder ? "Hasn't opened the link" : "Joined"}
+              </span>
             </span>
             {!p.isPayer && (
               <button onClick={() => run(() => removeParticipant(p.id))} className="btn-quiet text-sm">
@@ -351,6 +357,25 @@ export function PeoplePanel({ bill }: { bill: Bill }) {
           </li>
         ))}
       </ul>
+      {bill.group && bill.group.others.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted">From the group:</span>
+          {bill.group.others.map((m) => (
+            <button
+              key={m.id}
+              disabled={pending}
+              onClick={() => {
+                const fd = new FormData();
+                fd.set("memberId", m.id);
+                run(() => addPlaceholder(bill.id, fd));
+              }}
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ${personColor(m.color)}`}
+            >
+              + {m.displayName}
+            </button>
+          ))}
+        </div>
+      )}
       <form
         ref={form}
         onSubmit={(e) => {
@@ -376,7 +401,7 @@ export function BillActions({ bill }: { bill: Bill }) {
   return (
     <div className="card space-y-3">
       <h2 className="section-title">Settings</h2>
-      {bill.status === "OPEN" ? (
+      {bill.group ? null : bill.status === "OPEN" ? (
         <div className="space-y-1">
           <button disabled={pending} onClick={() => run(() => setStatus(bill.id, "LOCKED"))} className="btn btn-secondary w-full">
             Lock bill
