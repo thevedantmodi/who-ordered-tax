@@ -5,6 +5,7 @@ import { setItemSplit } from "@/app/actions";
 import { formatMoney } from "@/lib/money";
 import { isEvenSplit, weightsToPercents } from "@/lib/split";
 import { Avatar } from "@/components/Avatar";
+import { callAction } from "@/lib/use-action";
 
 type Person = { id: string; displayName: string; color: number };
 type Claim = { participantId: string; weight: number };
@@ -119,12 +120,9 @@ export function SplitEditor({
       percent: allEqual ? 100 / ordered.length : num(p.id),
     }));
     startTransition(async () => {
-      try {
-        await setItemSplit(itemId, shares);
-        onClose();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong");
-      }
+      const message = await callAction(() => setItemSplit(itemId, shares));
+      if (message) setError(message);
+      else onClose();
     });
   }
 

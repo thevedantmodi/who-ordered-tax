@@ -5,6 +5,7 @@ import type { BillDTO } from "@/lib/bills";
 import { claimPlaceholder, joinBill } from "@/app/actions";
 import { formatMoney } from "@/lib/money";
 import { Avatar } from "@/components/Avatar";
+import { callAction } from "@/lib/use-action";
 
 type Bill = NonNullable<BillDTO>;
 
@@ -17,11 +18,8 @@ export function JoinGate({ bill, defaultName }: { bill: Bill; defaultName?: stri
   const run = (fn: () => Promise<unknown>) => {
     setError(null);
     startTransition(async () => {
-      try {
-        await fn();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong");
-      }
+      const message = await callAction(fn);
+      if (message) setError(message);
     });
   };
 

@@ -15,26 +15,10 @@ import {
 } from "@/app/actions";
 import { formatMoney } from "@/lib/money";
 import { Avatar, AvatarStack, personColor } from "@/components/Avatar";
+import { callAction, useAction } from "@/lib/use-action";
 
 type Group = GroupDTO;
 type Member = Group["members"][number];
-
-function useAction() {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const run = (fn: () => Promise<unknown>, after?: () => void) => {
-    setError(null);
-    startTransition(async () => {
-      try {
-        await fn();
-        after?.();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong");
-      }
-    });
-  };
-  return { pending, error, run };
-}
 
 function ErrorNote({ error }: { error: string | null }) {
   return error ? <p className="text-sm text-danger">{error}</p> : null;
@@ -581,11 +565,8 @@ export function GroupSettings({ group }: { group: Group }) {
     setError(null);
     startTransition(async () => {
       setSimplify(next);
-      try {
-        await setSimplifyDebts(group.shareToken, next);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong");
-      }
+      const message = await callAction(() => setSimplifyDebts(group.shareToken, next));
+      if (message) setError(message);
     });
   };
   return (

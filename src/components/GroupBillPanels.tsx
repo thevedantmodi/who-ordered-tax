@@ -5,25 +5,9 @@ import Link from "next/link";
 import type { BillDTO } from "@/lib/bills";
 import { joinBill, moveBillToGroup, setPayer } from "@/app/actions";
 import { personColor } from "@/components/Avatar";
+import { callAction, useAction } from "@/lib/use-action";
 
 type Bill = NonNullable<BillDTO>;
-
-function useAction() {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const run = (fn: () => Promise<unknown>, after?: () => void) => {
-    setError(null);
-    startTransition(async () => {
-      try {
-        await fn();
-        after?.();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong");
-      }
-    });
-  };
-  return { pending, error, run };
-}
 
 /** Link back to the group, shown at the top of group bills. */
 export function GroupCrumb({ group }: { group: NonNullable<Bill["group"]> }) {
@@ -45,11 +29,8 @@ export function PaidByCard({ bill }: { bill: Bill }) {
     setError(null);
     startTransition(async () => {
       setPayerId(id);
-      try {
-        await setPayer(bill.id, id);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong");
-      }
+      const message = await callAction(() => setPayer(bill.id, id));
+      if (message) setError(message);
     });
   };
   return (

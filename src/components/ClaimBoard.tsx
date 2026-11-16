@@ -7,6 +7,7 @@ import { formatMoney } from "@/lib/money";
 import { isEvenSplit, weightsToPercents } from "@/lib/split";
 import { personColor } from "@/components/Avatar";
 import { SplitEditor } from "@/components/SplitEditor";
+import { callAction } from "@/lib/use-action";
 
 type Bill = NonNullable<BillDTO>;
 type OptimisticClaim = { itemId: string; participantId: string; claimed: boolean };
@@ -37,21 +38,15 @@ export function ClaimBoard({ bill, mode }: { bill: Bill; mode: "owner" | "guest"
     setError(null);
     startTransition(async () => {
       applyOptimistic({ itemId, participantId: actingId, claimed });
-      try {
-        await setClaim(itemId, actingId, claimed);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong");
-      }
+      const message = await callAction(() => setClaim(itemId, actingId, claimed));
+      if (message) setError(message);
     });
   }
 
   function remove(itemId: string) {
     startTransition(async () => {
-      try {
-        await deleteItem(itemId);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong");
-      }
+      const message = await callAction(() => deleteItem(itemId));
+      if (message) setError(message);
     });
   }
 

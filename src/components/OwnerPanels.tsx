@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BillDTO } from "@/lib/bills";
 import {
   addItem,
@@ -12,25 +12,9 @@ import {
 } from "@/app/actions";
 import { formatMoney } from "@/lib/money";
 import { Avatar, personColor } from "@/components/Avatar";
+import { useAction } from "@/lib/use-action";
 
 type Bill = NonNullable<BillDTO>;
-
-function useAction() {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const run = (fn: () => Promise<unknown>, after?: () => void) => {
-    setError(null);
-    startTransition(async () => {
-      try {
-        await fn();
-        after?.();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong");
-      }
-    });
-  };
-  return { pending, error, run };
-}
 
 function ErrorNote({ error }: { error: string | null }) {
   if (!error) return null;

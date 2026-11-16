@@ -5,6 +5,7 @@ import type { BillDTO } from "@/lib/bills";
 import { setPaid } from "@/app/actions";
 import { formatMoney } from "@/lib/money";
 import { Avatar } from "@/components/Avatar";
+import { callAction } from "@/lib/use-action";
 
 type Bill = NonNullable<BillDTO>;
 
@@ -12,6 +13,7 @@ export function Breakdown({ bill, mode }: { bill: Bill; mode: "owner" | "guest" 
   const { split } = bill;
   const [open, setOpen] = useState<string | null>(bill.viewer.meId);
   const [, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const payer = bill.participants.find((p) => p.isPayer);
   const shareById = new Map(split.shares.map((s) => [s.participantId, s]));
   const itemName = new Map(bill.items.map((i) => [i.id, i.name]));
@@ -23,6 +25,7 @@ export function Breakdown({ bill, mode }: { bill: Bill; mode: "owner" | "guest" 
   return (
     <section className="space-y-3">
       <h2 className="section-title">Breakdown</h2>
+      {error && <p className="notice">{error}</p>}
 
       {split.unclaimedItemIds.length > 0 && (
         <p className="notice">
@@ -92,7 +95,12 @@ export function Breakdown({ bill, mode }: { bill: Bill; mode: "owner" | "guest" 
                   )}
                   {mode === "owner" && !bill.group && !p.isPayer && (
                     <button
-                      onClick={() => startTransition(() => setPaid(p.id, !p.paidAt))}
+                      onClick={() =>
+                        startTransition(async () => {
+                          const message = await callAction(() => setPaid(p.id, !p.paidAt));
+                          if (message) setError(message);
+                        })
+                      }
                       className={`btn mt-3 w-full ${p.paidAt ? "btn-secondary" : "btn-primary"}`}
                     >
                       {p.paidAt ? "Mark as unpaid" : "Mark as paid"}

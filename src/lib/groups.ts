@@ -2,6 +2,7 @@ import "server-only";
 import { getSession } from "@/lib/session";
 import { db } from "@/lib/db";
 import { billInclude, computeSplit, resolveGroupMember } from "@/lib/bills";
+import { UserError } from "@/lib/action";
 import { netBalances, pairwiseTransfers, simplifiedTransfers, type GroupBillShares } from "@/lib/settle";
 
 export type GroupDTO = NonNullable<Awaited<ReturnType<typeof loadGroup>>>;
@@ -111,7 +112,7 @@ export async function loadGroupForAction(where: { id: string } | { shareToken: s
       },
     },
   });
-  if (!group) throw new Error("Group not found");
+  if (!group) throw new UserError("That group no longer exists.");
   const userId = (await getSession())?.user?.id ?? null;
   const member = await resolveGroupMember(group.id, group.members, userId);
   return { group, userId, member };

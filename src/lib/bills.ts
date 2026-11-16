@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { getSession } from "@/lib/session";
 import { db } from "@/lib/db";
 import { splitBill } from "@/lib/split";
+import { UserError } from "@/lib/action";
 
 export const guestCookieName = (billId: string) => `wot_g_${billId}`;
 export const groupCookieName = (groupId: string) => `wot_gm_${groupId}`;
@@ -181,6 +182,6 @@ export async function loadBill(where: { id: string } | { shareToken: string }) {
 /** For server actions: load the raw bill plus viewer, for authorization checks. */
 export async function loadBillForAction(where: { id: string } | { shareToken: string }) {
   const bill = await fetchBill(where);
-  if (!bill) throw new Error("Bill not found");
+  if (!bill) throw new UserError("That bill no longer exists.");
   return { bill, viewer: await resolveViewer(bill) };
 }

@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
 import { computeSplit, groupCookieName, guestCookieName, loadBillForAction } from "@/lib/bills";
 import { loadGroupForAction } from "@/lib/groups";
 import { parseMoney } from "@/lib/money";
+import { guard, UserError } from "@/lib/action";
 import { percentsToWeights } from "@/lib/split";
 import { isEmoji, randomEmoji } from "@/lib/emoji";
 
@@ -37,7 +38,7 @@ async function requireUser() {
 async function requireManager(billId: string) {
   const ctx = await loadBillForAction({ id: billId });
   if (!ctx.viewer.canManage) {
-    throw new Error(ctx.bill.group ? "Join the group to edit this bill" : "Only the payer can do that");
+    throw new UserError(ctx.bill.group ? "Join the group to edit this bill" : "Only the payer can do that");
   }
   return ctx;
 }
@@ -115,56 +116,64 @@ export async function createBill(formData: FormData) {
 }
 
 export async function deleteBill(billId: string) {
-  const { bill } = await requireManager(billId);
-  await db.bill.delete({ where: { id: billId } });
-  if (bill.group) {
-    touchGroup(bill.group);
-    redirect(`/g/${bill.group.shareToken}`);
-  }
-  revalidatePath("/bills");
-  redirect("/bills");
+  return guard(async () => {
+    const { bill } = await requireManager(billId);
+    await db.bill.delete({ where: { id: billId } });
+    if (bill.group) {
+      touchGroup(bill.group);
+      redirect(`/g/${bill.group.shareToken}`);
+    }
+    revalidatePath("/bills");
+    redirect("/bills");
+  });
 }
 
 export async function addItem(billId: string, formData: FormData) {
-  const { bill } = await requireManager(billId);
-  const itemName = name.parse(formData.get("name"));
-  const price = parseMoney(formData.get("price") as string | null);
-  if (price == null || price < 0) throw new Error("Invalid price");
-  const qty = Math.min(50, Math.max(1, Number(formData.get("qty")) || 1));
+  return guard(async () => {
+    const { bill } = await requireManager(billId);
+    const itemName = name.parse(formData.get("name"));
+    const price = parseMoney(formData.get("price") as string | null);
+    if (price == null || price < 0) throw new UserError("Invalid price");
+    const qty = Math.min(50, Math.max(1, Number(formData.get("qty")) || 1));
 
-  const last = await db.item.aggregate({ where: { billId }, _max: { position: true } });
-  const start = (last._max.position ?? -1) + 1;
-  await db.item.createMany({
-    data: Array.from({ length: qty }, (_, i) => ({
-      billId,
-      name: itemName,
-      priceCents: price,
-      position: start + i,
-    })),
+    const last = await db.item.aggregate({ where: { billId }, _max: { position: true } });
+    const start = (last._max.position ?? -1) + 1;
+    await db.item.createMany({
+      data: Array.from({ length: qty }, (_, i) => ({
+        billId,
+        name: itemName,
+        priceCents: price,
+        position: start + i,
+      })),
+    });
+    touch(bill);
   });
-  touch(bill);
 }
 
 export async function updateItem(itemId: string, data: { name?: string; price?: string }) {
-  const item = await db.item.findUniqueOrThrow({ where: { id: itemId } });
-  const { bill } = await requireManager(item.billId);
-  const priceCents = data.price !== undefined ? parseMoney(data.price) : undefined;
-  if (priceCents === null || (priceCents !== undefined && priceCents < 0)) throw new Error("Invalid price");
-  await db.item.update({
-    where: { id: itemId },
-    data: {
-      name: data.name !== undefined ? name.parse(data.name) : undefined,
-      priceCents,
-    },
+  return guard(async () => {
+    const item = await db.item.findUniqueOrThrow({ where: { id: itemId } });
+    const { bill } = await requireManager(item.billId);
+    const priceCents = data.price !== undefined ? parseMoney(data.price) : undefined;
+    if (priceCents === null || (priceCents !== undefined && priceCents < 0)) throw new UserError("Invalid price");
+    await db.item.update({
+      where: { id: itemId },
+      data: {
+        name: data.name !== undefined ? name.parse(data.name) : undefined,
+        priceCents,
+      },
+    });
+    touch(bill);
   });
-  touch(bill);
 }
 
 export async function deleteItem(itemId: string) {
-  const item = await db.item.findUniqueOrThrow({ where: { id: itemId } });
-  const { bill } = await requireManager(item.billId);
-  await db.item.delete({ where: { id: itemId } });
-  touch(bill);
+  return guard(async () => {
+    const item = await db.item.findUniqueOrThrow({ where: { id: itemId } });
+    const { bill } = await requireManager(item.billId);
+    await db.item.delete({ where: { id: itemId } });
+    touch(bill);
+  });
 }
 
 const chargesSchema = z.object({
@@ -179,94 +188,104 @@ const chargesSchema = z.object({
 });
 
 export async function updateCharges(billId: string, formData: FormData) {
-  const { bill } = await requireManager(billId);
-  const c = chargesSchema.parse(Object.fromEntries(formData));
-  const money = (s: string) => {
-    const v = parseMoney(s);
-    if (v == null || v < 0) throw new Error("Invalid amount");
-    return v;
-  };
-  const percent = (s: string, what: string) => {
-    const v = Number(s.replace(/[%\s]/g, "") || 0);
-    if (!Number.isFinite(v) || v < 0 || v > 100) throw new Error(`Invalid ${what} %`);
-    return v;
-  };
-  const isPercent = c.tipMode !== "AMOUNT";
-  const pct = isPercent ? percent(c.tip, "tip") : 0;
-  const taxIsPercent = c.taxMode === "PERCENT";
+  return guard(async () => {
+    const { bill } = await requireManager(billId);
+    const c = chargesSchema.parse(Object.fromEntries(formData));
+    const money = (s: string) => {
+      const v = parseMoney(s);
+      if (v == null || v < 0) throw new UserError("Invalid amount");
+      return v;
+    };
+    const percent = (s: string, what: string) => {
+      const v = Number(s.replace(/[%\s]/g, "") || 0);
+      if (!Number.isFinite(v) || v < 0 || v > 100) throw new UserError(`Invalid ${what} %`);
+      return v;
+    };
+    const isPercent = c.tipMode !== "AMOUNT";
+    const pct = isPercent ? percent(c.tip, "tip") : 0;
+    const taxIsPercent = c.taxMode === "PERCENT";
 
-  await db.bill.update({
-    where: { id: billId },
-    data: {
-      taxMode: c.taxMode,
-      taxCents: taxIsPercent ? 0 : money(c.tax),
-      taxPercent: taxIsPercent ? percent(c.tax, "tax") : 0,
-      tipMode: c.tipMode,
-      tipCents: isPercent ? 0 : money(c.tip),
-      tipPercent: isPercent ? pct : 0,
-      feesCents: money(c.fees),
-      feeMode: c.feeMode,
-      discountCents: money(c.discount),
-      unclaimedPolicy: c.unclaimedPolicy,
-    },
+    await db.bill.update({
+      where: { id: billId },
+      data: {
+        taxMode: c.taxMode,
+        taxCents: taxIsPercent ? 0 : money(c.tax),
+        taxPercent: taxIsPercent ? percent(c.tax, "tax") : 0,
+        tipMode: c.tipMode,
+        tipCents: isPercent ? 0 : money(c.tip),
+        tipPercent: isPercent ? pct : 0,
+        feesCents: money(c.fees),
+        feeMode: c.feeMode,
+        discountCents: money(c.discount),
+        unclaimedPolicy: c.unclaimedPolicy,
+      },
+    });
+    touch(bill);
   });
-  touch(bill);
 }
 
 export async function addPlaceholder(billId: string, formData: FormData) {
-  const { bill } = await requireManager(billId);
-  if (!bill.group) {
-    await db.participant.create({
-      data: { billId, displayName: name.parse(formData.get("name")), emoji: randomEmoji() },
-    });
+  return guard(async () => {
+    const { bill } = await requireManager(billId);
+    if (!bill.group) {
+      await db.participant.create({
+        data: { billId, displayName: name.parse(formData.get("name")), emoji: randomEmoji() },
+      });
+      touch(bill);
+      return;
+    }
+    // Group bill: add someone already in the group, or add a new person to the group and the bill.
+    const memberId = formData.get("memberId");
+    let member = typeof memberId === "string" && memberId ? bill.group.members.find((m) => m.id === memberId) : undefined;
+    if (typeof memberId === "string" && memberId && !member) throw new UserError("Not in this group");
+    if (!member) {
+      member = await db.groupMember.create({
+        data: { groupId: bill.group.id, displayName: name.parse(formData.get("name")) },
+        select: { id: true, userId: true, guestSecret: true, displayName: true },
+      });
+    }
+    if (bill.participants.some((p) => p.memberId === member.id)) return;
+    await db.participant.create({ data: { billId, memberId: member.id, displayName: member.displayName } });
     touch(bill);
-    return;
-  }
-  // Group bill: add someone already in the group, or add a new person to the group and the bill.
-  const memberId = formData.get("memberId");
-  let member = typeof memberId === "string" && memberId ? bill.group.members.find((m) => m.id === memberId) : undefined;
-  if (typeof memberId === "string" && memberId && !member) throw new Error("Not in this group");
-  if (!member) {
-    member = await db.groupMember.create({
-      data: { groupId: bill.group.id, displayName: name.parse(formData.get("name")) },
-      select: { id: true, userId: true, guestSecret: true, displayName: true },
-    });
-  }
-  if (bill.participants.some((p) => p.memberId === member.id)) return;
-  await db.participant.create({ data: { billId, memberId: member.id, displayName: member.displayName } });
-  touch(bill);
+  });
 }
 
 export async function removeParticipant(participantId: string) {
-  const p = await db.participant.findUniqueOrThrow({ where: { id: participantId } });
-  const { bill } = await requireManager(p.billId);
-  if (p.isPayer) throw new Error("The payer can't leave their own bill");
-  await db.participant.delete({ where: { id: participantId } });
-  touch(bill);
+  return guard(async () => {
+    const p = await db.participant.findUniqueOrThrow({ where: { id: participantId } });
+    const { bill } = await requireManager(p.billId);
+    if (p.isPayer) throw new UserError("The payer can't leave their own bill");
+    await db.participant.delete({ where: { id: participantId } });
+    touch(bill);
+  });
 }
 
 export async function setPaid(participantId: string, paid: boolean) {
-  const p = await db.participant.findUniqueOrThrow({ where: { id: participantId } });
-  const { bill } = await requireManager(p.billId);
-  if (bill.group) throw new Error("Group bills are settled up in the group");
-  await db.participant.update({ where: { id: participantId }, data: { paidAt: paid ? new Date() : null } });
+  return guard(async () => {
+    const p = await db.participant.findUniqueOrThrow({ where: { id: participantId } });
+    const { bill } = await requireManager(p.billId);
+    if (bill.group) throw new UserError("Group bills are settled up in the group");
+    await db.participant.update({ where: { id: participantId }, data: { paidAt: paid ? new Date() : null } });
 
-  const outstanding = await db.participant.count({
-    where: { billId: bill.id, isPayer: false, paidAt: null },
+    const outstanding = await db.participant.count({
+      where: { billId: bill.id, isPayer: false, paidAt: null },
+    });
+    const total = await db.participant.count({ where: { billId: bill.id, isPayer: false } });
+    if (total > 0 && outstanding === 0) {
+      await db.bill.update({ where: { id: bill.id }, data: { status: "SETTLED" } });
+    } else if (bill.status === "SETTLED") {
+      await db.bill.update({ where: { id: bill.id }, data: { status: "LOCKED" } });
+    }
+    touch(bill);
   });
-  const total = await db.participant.count({ where: { billId: bill.id, isPayer: false } });
-  if (total > 0 && outstanding === 0) {
-    await db.bill.update({ where: { id: bill.id }, data: { status: "SETTLED" } });
-  } else if (bill.status === "SETTLED") {
-    await db.bill.update({ where: { id: bill.id }, data: { status: "LOCKED" } });
-  }
-  touch(bill);
 }
 
 export async function setStatus(billId: string, status: "OPEN" | "LOCKED") {
-  const { bill } = await requireManager(billId);
-  await db.bill.update({ where: { id: billId }, data: { status } });
-  touch(bill);
+  return guard(async () => {
+    const { bill } = await requireManager(billId);
+    await db.bill.update({ where: { id: billId }, data: { status } });
+    touch(bill);
+  });
 }
 
 // ---------- Guests & claiming (anyone with the link) ----------
@@ -275,68 +294,72 @@ const setGuestCookie = (billId: string, secret: string) => setCookie(guestCookie
 const setGroupCookie = (groupId: string, secret: string) => setCookie(groupCookieName(groupId), secret);
 
 export async function joinBill(shareToken: string, formData: FormData) {
-  const { bill, viewer } = await loadBillForAction({ shareToken });
-  if (viewer.meId) return;
-  if (bill.status !== "OPEN") throw new Error("This bill is locked");
+  return guard(async () => {
+    const { bill, viewer } = await loadBillForAction({ shareToken });
+    if (viewer.meId) return;
+    if (bill.status !== "OPEN") throw new UserError("This bill is locked");
 
-  const emojiRaw = formData.get("emoji");
-  const emoji = isEmoji(emojiRaw) ? emojiRaw : randomEmoji();
+    const emojiRaw = formData.get("emoji");
+    const emoji = isEmoji(emojiRaw) ? emojiRaw : randomEmoji();
 
-  if (bill.group) {
-    // Already in the group: just add them to this bill.
-    let member = viewer.memberId ? bill.group.members.find((m) => m.id === viewer.memberId) : undefined;
-    if (!member) {
-      const displayName = name.parse(formData.get("name"));
-      const secret = viewer.userId ? null : newSecret();
-      member = await db.groupMember.create({
-        data: { groupId: bill.group.id, displayName, userId: viewer.userId, guestSecret: secret },
-        select: { id: true, userId: true, guestSecret: true, displayName: true },
+    if (bill.group) {
+      // Already in the group: just add them to this bill.
+      let member = viewer.memberId ? bill.group.members.find((m) => m.id === viewer.memberId) : undefined;
+      if (!member) {
+        const displayName = name.parse(formData.get("name"));
+        const secret = viewer.userId ? null : newSecret();
+        member = await db.groupMember.create({
+          data: { groupId: bill.group.id, displayName, userId: viewer.userId, guestSecret: secret },
+          select: { id: true, userId: true, guestSecret: true, displayName: true },
+        });
+        if (secret) await setGroupCookie(bill.group.id, secret);
+      }
+      await db.participant.create({
+        data: { billId: bill.id, memberId: member.id, userId: viewer.userId, displayName: member.displayName, emoji },
       });
-      if (secret) await setGroupCookie(bill.group.id, secret);
+      touch(bill);
+      return;
     }
-    await db.participant.create({
-      data: { billId: bill.id, memberId: member.id, userId: viewer.userId, displayName: member.displayName, emoji },
-    });
-    touch(bill);
-    return;
-  }
 
-  const displayName = name.parse(formData.get("name"));
-  if (viewer.userId) {
-    await db.participant.create({ data: { billId: bill.id, userId: viewer.userId, displayName, emoji } });
-  } else {
-    const secret = newSecret();
-    await db.participant.create({ data: { billId: bill.id, guestSecret: secret, displayName, emoji } });
-    await setGuestCookie(bill.id, secret);
-  }
-  touch(bill);
+    const displayName = name.parse(formData.get("name"));
+    if (viewer.userId) {
+      await db.participant.create({ data: { billId: bill.id, userId: viewer.userId, displayName, emoji } });
+    } else {
+      const secret = newSecret();
+      await db.participant.create({ data: { billId: bill.id, guestSecret: secret, displayName, emoji } });
+      await setGuestCookie(bill.id, secret);
+    }
+    touch(bill);
+  });
 }
 
 /** "That's me!" — take over a placeholder the payer added. */
 export async function claimPlaceholder(shareToken: string, participantId: string) {
-  const { bill, viewer } = await loadBillForAction({ shareToken });
-  if (viewer.meId) return;
-  const p = bill.participants.find((x) => x.id === participantId);
-  if (p?.memberId && bill.group) {
-    await claimMember(bill.group.id, p.memberId, viewer.userId);
-    touch(bill);
-    return;
-  }
-  if (!p || p.userId || p.guestSecret) throw new Error("Someone already took that spot");
+  return guard(async () => {
+    const { bill, viewer } = await loadBillForAction({ shareToken });
+    if (viewer.meId) return;
+    const p = bill.participants.find((x) => x.id === participantId);
+    if (p?.memberId && bill.group) {
+      await claimMember(bill.group.id, p.memberId, viewer.userId);
+      touch(bill);
+      return;
+    }
+    if (!p || p.userId || p.guestSecret) throw new UserError("Someone already took that spot");
 
-  if (viewer.userId) {
-    await db.participant.update({ where: { id: p.id }, data: { userId: viewer.userId } });
-  } else {
-    const secret = newSecret();
-    // updateMany with the null guard makes this race-safe.
-    const res = await db.participant.updateMany({
-      where: { id: p.id, userId: null, guestSecret: null },
-      data: { guestSecret: secret },
-    });
-    if (res.count === 0) throw new Error("Someone already took that spot");
-    await setGuestCookie(bill.id, secret);
-  }
-  touch(bill);
+    if (viewer.userId) {
+      await db.participant.update({ where: { id: p.id }, data: { userId: viewer.userId } });
+    } else {
+      const secret = newSecret();
+      // updateMany with the null guard makes this race-safe.
+      const res = await db.participant.updateMany({
+        where: { id: p.id, userId: null, guestSecret: null },
+        data: { guestSecret: secret },
+      });
+      if (res.count === 0) throw new UserError("Someone already took that spot");
+      await setGuestCookie(bill.id, secret);
+    }
+    touch(bill);
+  });
 }
 
 /**
@@ -345,23 +368,25 @@ export async function claimPlaceholder(shareToken: string, participantId: string
  * people it was set for, so whenever the group on an item changes, it resets to an even split.
  */
 export async function setClaim(itemId: string, participantId: string, claimed: boolean) {
-  const item = await db.item.findUniqueOrThrow({ where: { id: itemId }, include: { claims: true } });
-  const { bill, viewer } = await loadBillForAction({ id: item.billId });
+  return guard(async () => {
+    const item = await db.item.findUniqueOrThrow({ where: { id: itemId }, include: { claims: true } });
+    const { bill, viewer } = await loadBillForAction({ id: item.billId });
 
-  if (!bill.participants.some((p) => p.id === participantId)) throw new Error("Not on this bill");
-  const allowed = viewer.canManage || (viewer.meId === participantId && bill.status === "OPEN");
-  if (!allowed) throw new Error("You can only claim your own items");
+    if (!bill.participants.some((p) => p.id === participantId)) throw new UserError("Not on this bill");
+    const allowed = viewer.canManage || (viewer.meId === participantId && bill.status === "OPEN");
+    if (!allowed) throw new UserError("You can only claim your own items");
 
-  const has = item.claims.some((c) => c.participantId === participantId);
-  if (has === claimed) return;
+    const has = item.claims.some((c) => c.participantId === participantId);
+    if (has === claimed) return;
 
-  await db.$transaction([
-    claimed
-      ? db.claim.create({ data: { itemId, participantId, weight: 1 } })
-      : db.claim.delete({ where: { itemId_participantId: { itemId, participantId } } }),
-    db.claim.updateMany({ where: { itemId }, data: { weight: 1 } }),
-  ]);
-  touch(bill);
+    await db.$transaction([
+      claimed
+        ? db.claim.create({ data: { itemId, participantId, weight: 1 } })
+        : db.claim.delete({ where: { itemId_participantId: { itemId, participantId } } }),
+      db.claim.updateMany({ where: { itemId }, data: { weight: 1 } }),
+    ]);
+    touch(bill);
+  });
 }
 
 const itemSplitSchema = z
@@ -374,27 +399,29 @@ const itemSplitSchema = z
  * time; anyone who has joined the bill can do it while it's open (same rule as claiming).
  */
 export async function setItemSplit(itemId: string, shares: { participantId: string; percent: number }[]) {
-  const item = await db.item.findUniqueOrThrow({ where: { id: itemId } });
-  const { bill, viewer } = await loadBillForAction({ id: item.billId });
-  const allowed = viewer.canManage || (viewer.meId !== null && bill.status === "OPEN");
-  if (!allowed) throw new Error(bill.status === "OPEN" ? "Join the bill to split items" : "This bill is locked");
-  const parsed = itemSplitSchema.parse(shares);
+  return guard(async () => {
+    const item = await db.item.findUniqueOrThrow({ where: { id: itemId } });
+    const { bill, viewer } = await loadBillForAction({ id: item.billId });
+    const allowed = viewer.canManage || (viewer.meId !== null && bill.status === "OPEN");
+    if (!allowed) throw new UserError(bill.status === "OPEN" ? "Join the bill to split items" : "This bill is locked");
+    const parsed = itemSplitSchema.parse(shares);
 
-  const onBill = new Set(bill.participants.map((p) => p.id));
-  if (parsed.some((s) => !onBill.has(s.participantId))) throw new Error("Not on this bill");
-  if (new Set(parsed.map((s) => s.participantId)).size !== parsed.length) throw new Error("Someone is listed twice");
-  const total = parsed.reduce((a, s) => a + s.percent, 0);
-  if (Math.abs(total - 100) > 0.01) throw new Error("Shares must add up to 100%");
-  const weights = percentsToWeights(parsed.map((s) => s.percent));
-  if (weights.some((w) => w < 1)) throw new Error("Each share must be at least 0.01%");
+    const onBill = new Set(bill.participants.map((p) => p.id));
+    if (parsed.some((s) => !onBill.has(s.participantId))) throw new UserError("Not on this bill");
+    if (new Set(parsed.map((s) => s.participantId)).size !== parsed.length) throw new UserError("Someone is listed twice");
+    const total = parsed.reduce((a, s) => a + s.percent, 0);
+    if (Math.abs(total - 100) > 0.01) throw new UserError("Shares must add up to 100%");
+    const weights = percentsToWeights(parsed.map((s) => s.percent));
+    if (weights.some((w) => w < 1)) throw new UserError("Each share must be at least 0.01%");
 
-  await db.$transaction([
-    db.claim.deleteMany({ where: { itemId } }),
-    db.claim.createMany({
-      data: parsed.map((s, i) => ({ itemId, participantId: s.participantId, weight: weights[i] })),
-    }),
-  ]);
-  touch(bill);
+    await db.$transaction([
+      db.claim.deleteMany({ where: { itemId } }),
+      db.claim.createMany({
+        data: parsed.map((s, i) => ({ itemId, participantId: s.participantId, weight: weights[i] })),
+      }),
+    ]);
+    touch(bill);
+  });
 }
 
 // ---------- Groups ----------
@@ -403,26 +430,26 @@ export async function setItemSplit(itemId: string, shares: { participantId: stri
 async function claimMember(groupId: string, memberId: string, userId: string | null) {
   if (userId) {
     const taken = await db.groupMember.findFirst({ where: { groupId, userId } });
-    if (taken) throw new Error("You're already in this group");
+    if (taken) throw new UserError("You're already in this group");
     const res = await db.groupMember.updateMany({
       where: { id: memberId, groupId, userId: null, guestSecret: null },
       data: { userId },
     });
-    if (res.count === 0) throw new Error("Someone already took that spot");
+    if (res.count === 0) throw new UserError("Someone already took that spot");
   } else {
     const secret = newSecret();
     const res = await db.groupMember.updateMany({
       where: { id: memberId, groupId, userId: null, guestSecret: null },
       data: { guestSecret: secret },
     });
-    if (res.count === 0) throw new Error("Someone already took that spot");
+    if (res.count === 0) throw new UserError("Someone already took that spot");
     await setGroupCookie(groupId, secret);
   }
 }
 
 async function requireMember(groupToken: string) {
   const ctx = await loadGroupForAction({ shareToken: groupToken });
-  if (!ctx.member) throw new Error("Join the group first");
+  if (!ctx.member) throw new UserError("Join the group first");
   return { ...ctx, member: ctx.member };
 }
 
@@ -447,58 +474,68 @@ export async function createGroup(formData: FormData) {
 }
 
 export async function joinGroup(groupToken: string, formData: FormData) {
-  const { group, userId, member } = await loadGroupForAction({ shareToken: groupToken });
-  if (member) return;
-  const displayName = name.parse(formData.get("name"));
-  const secret = userId ? null : newSecret();
-  await db.groupMember.create({ data: { groupId: group.id, displayName, userId, guestSecret: secret } });
-  if (secret) await setGroupCookie(group.id, secret);
-  touchGroup(group);
+  return guard(async () => {
+    const { group, userId, member } = await loadGroupForAction({ shareToken: groupToken });
+    if (member) return;
+    const displayName = name.parse(formData.get("name"));
+    const secret = userId ? null : newSecret();
+    await db.groupMember.create({ data: { groupId: group.id, displayName, userId, guestSecret: secret } });
+    if (secret) await setGroupCookie(group.id, secret);
+    touchGroup(group);
+  });
 }
 
 export async function claimGroupMember(groupToken: string, memberId: string) {
-  const { group, userId, member } = await loadGroupForAction({ shareToken: groupToken });
-  if (member) return;
-  await claimMember(group.id, memberId, userId);
-  touchGroup(group);
+  return guard(async () => {
+    const { group, userId, member } = await loadGroupForAction({ shareToken: groupToken });
+    if (member) return;
+    await claimMember(group.id, memberId, userId);
+    touchGroup(group);
+  });
 }
 
 export async function addGroupMember(groupToken: string, formData: FormData) {
-  const { group } = await requireMember(groupToken);
-  await db.groupMember.create({ data: { groupId: group.id, displayName: name.parse(formData.get("name")) } });
-  touchGroup(group);
+  return guard(async () => {
+    const { group } = await requireMember(groupToken);
+    await db.groupMember.create({ data: { groupId: group.id, displayName: name.parse(formData.get("name")) } });
+    touchGroup(group);
+  });
 }
 
 export async function setSimplifyDebts(groupToken: string, simplify: boolean) {
-  const { group } = await requireMember(groupToken);
-  await db.group.update({ where: { id: group.id }, data: { simplifyDebts: simplify } });
-  touchGroup(group);
+  return guard(async () => {
+    const { group } = await requireMember(groupToken);
+    await db.group.update({ where: { id: group.id }, data: { simplifyDebts: simplify } });
+    touchGroup(group);
+  });
 }
 
 /** An itemized bill in the group: everyone in the group is on it, and whoever adds it paid. */
 export async function createGroupBill(groupToken: string, formData: FormData) {
-  const { group, userId, member } = await requireMember(groupToken);
-  const title = name.parse(formData.get("title"));
-  const merchant = z.string().trim().max(80).optional().parse(formData.get("merchant") || undefined);
-  const bill = await db.bill.create({
-    data: {
-      ownerId: userId,
-      groupId: group.id,
-      title,
-      merchant,
-      shareToken: shareId(),
-      participants: {
-        create: group.members.map((m) => ({
-          memberId: m.id,
-          userId: m.userId,
-          displayName: m.displayName,
-          isPayer: m.id === member.id,
-        })),
+  return guard(async () => {
+    const { group, userId, member } = await requireMember(groupToken);
+    const title = name.parse(formData.get("title"));
+    const merchant = z.string().trim().max(80).optional().parse(formData.get("merchant") || undefined);
+    const bill = await db.bill.create({
+      data: {
+        ownerId: userId,
+        groupId: group.id,
+        title,
+        merchant,
+        shareToken: shareId(),
+        participants: {
+          create: group.members.map((m) => ({
+            memberId: m.id,
+            userId: m.userId,
+            displayName: m.displayName,
+            isPayer: m.id === member.id,
+          })),
+        },
       },
-    },
+    });
+    touchGroup(group);
+    redirect(`/b/${bill.shareToken}`);
   });
-  touchGroup(group);
-  redirect(`/b/${bill.shareToken}`);
 }
 
 const quickExpenseSchema = z.object({
@@ -510,84 +547,92 @@ const quickExpenseSchema = z.object({
 
 /** A no-receipt expense ("Uber $30, paid by Sam, split between all of us"): a one-line bill. */
 export async function createQuickExpense(groupToken: string, formData: FormData) {
-  const { group, userId } = await requireMember(groupToken);
-  const q = quickExpenseSchema.parse({
-    title: formData.get("title"),
-    amount: formData.get("amount"),
-    paidBy: formData.get("paidBy"),
-    split: formData.getAll("split"),
-  });
-  const amount = parseMoney(q.amount);
-  if (amount == null || amount <= 0) throw new Error("Enter an amount");
-  const ids = new Set(group.members.map((m) => m.id));
-  if (!ids.has(q.paidBy) || q.split.some((id) => !ids.has(id))) throw new Error("Not in this group");
+  return guard(async () => {
+    const { group, userId } = await requireMember(groupToken);
+    const q = quickExpenseSchema.parse({
+      title: formData.get("title"),
+      amount: formData.get("amount"),
+      paidBy: formData.get("paidBy"),
+      split: formData.getAll("split"),
+    });
+    const amount = parseMoney(q.amount);
+    if (amount == null || amount <= 0) throw new UserError("Enter an amount");
+    const ids = new Set(group.members.map((m) => m.id));
+    if (!ids.has(q.paidBy) || q.split.some((id) => !ids.has(id))) throw new UserError("Not in this group");
 
-  const people = group.members.filter((m) => m.id === q.paidBy || q.split.includes(m.id));
-  const bill = await db.bill.create({
-    data: {
-      ownerId: userId,
-      groupId: group.id,
-      title: q.title,
-      shareToken: shareId(),
-      participants: {
-        create: people.map((m) => ({
-          memberId: m.id,
-          userId: m.userId,
-          displayName: m.displayName,
-          isPayer: m.id === q.paidBy,
-        })),
+    const people = group.members.filter((m) => m.id === q.paidBy || q.split.includes(m.id));
+    const bill = await db.bill.create({
+      data: {
+        ownerId: userId,
+        groupId: group.id,
+        title: q.title,
+        shareToken: shareId(),
+        participants: {
+          create: people.map((m) => ({
+            memberId: m.id,
+            userId: m.userId,
+            displayName: m.displayName,
+            isPayer: m.id === q.paidBy,
+          })),
+        },
       },
-    },
-    include: { participants: true },
-  });
-  await db.item.create({
-    data: {
-      billId: bill.id,
-      name: q.title,
-      priceCents: amount,
-      claims: {
-        create: bill.participants
-          .filter((p) => p.memberId && q.split.includes(p.memberId))
-          .map((p) => ({ participantId: p.id, weight: 1 })),
+      include: { participants: true },
+    });
+    await db.item.create({
+      data: {
+        billId: bill.id,
+        name: q.title,
+        priceCents: amount,
+        claims: {
+          create: bill.participants
+            .filter((p) => p.memberId && q.split.includes(p.memberId))
+            .map((p) => ({ participantId: p.id, weight: 1 })),
+        },
       },
-    },
+    });
+    touchGroup(group);
   });
-  touchGroup(group);
 }
 
 /** Group bills: who actually paid at the register. */
 export async function setPayer(billId: string, participantId: string) {
-  const { bill } = await requireManager(billId);
-  if (!bill.group) throw new Error("Only group bills can change who paid");
-  if (!bill.participants.some((p) => p.id === participantId)) throw new Error("Not on this bill");
-  await db.$transaction([
-    db.participant.updateMany({ where: { billId }, data: { isPayer: false } }),
-    db.participant.update({ where: { id: participantId }, data: { isPayer: true } }),
-  ]);
-  touch(bill);
+  return guard(async () => {
+    const { bill } = await requireManager(billId);
+    if (!bill.group) throw new UserError("Only group bills can change who paid");
+    if (!bill.participants.some((p) => p.id === participantId)) throw new UserError("Not on this bill");
+    await db.$transaction([
+      db.participant.updateMany({ where: { billId }, data: { isPayer: false } }),
+      db.participant.update({ where: { id: participantId }, data: { isPayer: true } }),
+    ]);
+    touch(bill);
+  });
 }
 
 export async function recordPayment(
   groupToken: string,
   payment: { fromMemberId: string; toMemberId: string; amount: string },
 ) {
-  const { group } = await requireMember(groupToken);
-  const ids = new Set(group.members.map((m) => m.id));
-  if (!ids.has(payment.fromMemberId) || !ids.has(payment.toMemberId)) throw new Error("Not in this group");
-  if (payment.fromMemberId === payment.toMemberId) throw new Error("Pick two different people");
-  const amountCents = parseMoney(payment.amount);
-  if (amountCents == null || amountCents <= 0) throw new Error("Enter an amount");
-  await db.payment.create({
-    data: { groupId: group.id, fromMemberId: payment.fromMemberId, toMemberId: payment.toMemberId, amountCents },
+  return guard(async () => {
+    const { group } = await requireMember(groupToken);
+    const ids = new Set(group.members.map((m) => m.id));
+    if (!ids.has(payment.fromMemberId) || !ids.has(payment.toMemberId)) throw new UserError("Not in this group");
+    if (payment.fromMemberId === payment.toMemberId) throw new UserError("Pick two different people");
+    const amountCents = parseMoney(payment.amount);
+    if (amountCents == null || amountCents <= 0) throw new UserError("Enter an amount");
+    await db.payment.create({
+      data: { groupId: group.id, fromMemberId: payment.fromMemberId, toMemberId: payment.toMemberId, amountCents },
+    });
+    touchGroup(group);
   });
-  touchGroup(group);
 }
 
 export async function deletePayment(paymentId: string) {
-  const payment = await db.payment.findUniqueOrThrow({ where: { id: paymentId }, include: { group: true } });
-  const { group } = await requireMember(payment.group.shareToken);
-  await db.payment.delete({ where: { id: paymentId } });
-  touchGroup(group);
+  return guard(async () => {
+    const payment = await db.payment.findUniqueOrThrow({ where: { id: paymentId }, include: { group: true } });
+    const { group } = await requireMember(payment.group.shareToken);
+    await db.payment.delete({ where: { id: paymentId } });
+    touchGroup(group);
+  });
 }
 
 /**
@@ -596,63 +641,65 @@ export async function deletePayment(paymentId: string) {
  * balance doesn't count their share twice.
  */
 export async function moveBillToGroup(billId: string, groupId: string, mapping: Record<string, string>) {
-  const user = await requireUser();
-  const { bill } = await loadBillForAction({ id: billId });
-  if (bill.ownerId !== user.id) throw new Error("Only the payer can move this bill");
-  if (bill.group) throw new Error("This bill is already in a group");
-  const { group } = await loadGroupForAction({ id: groupId });
-  if (!group.members.some((m) => m.userId === user.id)) throw new Error("You're not in that group");
+  return guard(async () => {
+    const user = await requireUser();
+    const { bill } = await loadBillForAction({ id: billId });
+    if (bill.ownerId !== user.id) throw new UserError("Only the payer can move this bill");
+    if (bill.group) throw new UserError("This bill is already in a group");
+    const { group } = await loadGroupForAction({ id: groupId });
+    if (!group.members.some((m) => m.userId === user.id)) throw new UserError("You're not in that group");
 
-  const memberIds = new Set(group.members.map((m) => m.id));
-  const chosen = new Set<string>();
-  for (const p of bill.participants) {
-    const target = mapping[p.id];
-    if (!target) throw new Error(`Pick who ${p.displayName} is in the group`);
-    if (target === "new") continue;
-    if (!memberIds.has(target)) throw new Error("Not in this group");
-    if (chosen.has(target)) throw new Error("Two people can't be the same group member");
-    chosen.add(target);
-    // Someone with an account must map to their own member if they're already in the group.
-    const own = p.userId ? group.members.find((m) => m.userId === p.userId) : undefined;
-    if (own && own.id !== target) throw new Error(`${p.displayName} is already in the group as ${own.displayName}`);
-  }
-
-  const split = computeSplit(bill);
-  const totalFor = new Map(split.shares.map((s) => [s.participantId, s.totalCents]));
-
-  await db.$transaction(async (tx) => {
-    const memberFor = new Map<string, string>();
+    const memberIds = new Set(group.members.map((m) => m.id));
+    const chosen = new Set<string>();
     for (const p of bill.participants) {
-      let target = mapping[p.id];
-      if (target === "new") {
-        const own = p.userId ? group.members.find((m) => m.userId === p.userId) : undefined;
-        target =
-          own?.id ??
-          (await tx.groupMember.create({ data: { groupId: group.id, displayName: p.displayName, userId: p.userId } })).id;
-      }
-      memberFor.set(p.id, target);
-      await tx.participant.update({ where: { id: p.id }, data: { memberId: target, paidAt: null } });
+      const target = mapping[p.id];
+      if (!target) throw new UserError(`Pick who ${p.displayName} is in the group`);
+      if (target === "new") continue;
+      if (!memberIds.has(target)) throw new UserError("Not in this group");
+      if (chosen.has(target)) throw new UserError("Two people can't be the same group member");
+      chosen.add(target);
+      // Someone with an account must map to their own member if they're already in the group.
+      const own = p.userId ? group.members.find((m) => m.userId === p.userId) : undefined;
+      if (own && own.id !== target) throw new UserError(`${p.displayName} is already in the group as ${own.displayName}`);
     }
-    const payer = bill.participants.find((p) => p.isPayer);
-    if (payer) {
+
+    const split = computeSplit(bill);
+    const totalFor = new Map(split.shares.map((s) => [s.participantId, s.totalCents]));
+
+    await db.$transaction(async (tx) => {
+      const memberFor = new Map<string, string>();
       for (const p of bill.participants) {
-        const cents = totalFor.get(p.id) ?? 0;
-        if (p.isPayer || !p.paidAt || cents <= 0) continue;
-        await tx.payment.create({
-          data: {
-            groupId: group.id,
-            fromMemberId: memberFor.get(p.id)!,
-            toMemberId: memberFor.get(payer.id)!,
-            amountCents: cents,
-            note: `Paid back for ${bill.title}`,
-          },
-        });
+        let target = mapping[p.id];
+        if (target === "new") {
+          const own = p.userId ? group.members.find((m) => m.userId === p.userId) : undefined;
+          target =
+            own?.id ??
+            (await tx.groupMember.create({ data: { groupId: group.id, displayName: p.displayName, userId: p.userId } })).id;
+        }
+        memberFor.set(p.id, target);
+        await tx.participant.update({ where: { id: p.id }, data: { memberId: target, paidAt: null } });
       }
-    }
-    await tx.bill.update({
-      where: { id: bill.id },
-      data: { groupId: group.id, status: bill.status === "SETTLED" ? "LOCKED" : bill.status },
+      const payer = bill.participants.find((p) => p.isPayer);
+      if (payer) {
+        for (const p of bill.participants) {
+          const cents = totalFor.get(p.id) ?? 0;
+          if (p.isPayer || !p.paidAt || cents <= 0) continue;
+          await tx.payment.create({
+            data: {
+              groupId: group.id,
+              fromMemberId: memberFor.get(p.id)!,
+              toMemberId: memberFor.get(payer.id)!,
+              amountCents: cents,
+              note: `Paid back for ${bill.title}`,
+            },
+          });
+        }
+      }
+      await tx.bill.update({
+        where: { id: bill.id },
+        data: { groupId: group.id, status: bill.status === "SETTLED" ? "LOCKED" : bill.status },
+      });
     });
+    touch({ shareToken: bill.shareToken, group: { shareToken: group.shareToken } });
   });
-  touch({ shareToken: bill.shareToken, group: { shareToken: group.shareToken } });
 }
